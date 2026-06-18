@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Morph Head Studio Mobile</title>
+  <style>
+    :root{
+      --bg:#080a10; --panel:rgba(14,17,25,.92); --panel2:rgba(28,31,42,.96); --text:#f4f7ff; --muted:#a3adbf;
+      --green:#48e58e; --cyan:#48c9ff; --line:rgba(255,255,255,.12); --warn:#ffd66f;
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;overflow:hidden}
+    #app{position:fixed;inset:0;background:#070a0f;overflow:hidden}
+    #stage{position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,#20242e 0,#070a0f 54%,#020305 100%)}
+    #webgl,#loomisFrame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#111}
+    #webgl{touch-action:none}
+    #loomisFrame{display:none}
+    header{position:absolute;z-index:10;top:0;left:0;right:0;padding:calc(11px + env(safe-area-inset-top)) 16px 12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:linear-gradient(180deg,rgba(5,7,10,.92),rgba(5,7,10,.55),rgba(5,7,10,0));pointer-events:none}
+    .title{font-size:21px;font-weight:900;letter-spacing:-.03em;text-align:right;line-height:1.05}
+    .sub{font-size:12px;color:var(--muted);margin-top:3px;direction:ltr;text-align:right}
+    .badge{direction:ltr;font-weight:900;color:#06120c;background:linear-gradient(90deg,var(--green),var(--cyan));border-radius:999px;padding:9px 12px;font-size:12px;box-shadow:0 10px 30px rgba(72,201,255,.18);white-space:nowrap}
+    #loader{position:absolute;z-index:9;inset:0;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;color:#cfd8e8;background:rgba(0,0,0,.24);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+    #loader.hidden{display:none}
+    #loader b{color:#fff}
+    .drawer{position:absolute;z-index:20;left:0;right:0;bottom:0;max-height:55vh;overflow:auto;padding:10px 12px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(8,10,16,0),rgba(8,10,16,.80) 7%,rgba(8,10,16,.98) 100%);border-top:1px solid rgba(255,255,255,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    .handle{width:58px;height:6px;border-radius:999px;background:rgba(255,255,255,.34);margin:0 auto 10px}
+    .tabs,.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;direction:ltr}
+    .chips{grid-template-columns:repeat(4,1fr);margin-top:8px}
+    button{font:inherit}
+    .tab,.chip,.btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:var(--text);border-radius:16px;padding:11px 7px;font-weight:850;font-size:12px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+    .tab.active,.chip.active,.btn.on{background:linear-gradient(90deg,var(--green),var(--cyan));color:#06120c;border-color:transparent}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+    .row.three{grid-template-columns:repeat(3,1fr)}
+    .btn{border-color:rgba(72,229,142,.45);background:rgba(72,229,142,.12);color:#d5ffe8}
+    .btn.warn{border-color:rgba(255,214,111,.35);background:rgba(255,214,111,.12);color:#ffe7a7}
+    .section{margin-top:10px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.045);border-radius:16px;padding:10px;text-align:right}
+    .section h3{margin:0 0 7px;font-size:13px;color:#dfffe9}
+    .section p{margin:5px 0;color:#c9d3e6;font-size:12px;line-height:1.35}
+    .sliders{display:flex;flex-direction:column;gap:8px;direction:ltr;text-align:left}
+    .sliderRow{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:8px 10px}
+    .sliderTop{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;color:#eef4ff;direction:ltr}
+    .sliderVal{color:var(--green);min-width:42px;text-align:right}
+    input[type=range]{width:100%;accent-color:var(--green);direction:ltr}
+    .status{margin-top:8px;font-size:11.5px;color:#99a7bb;line-height:1.35;text-align:right}
+    .error{color:#ffb4b4}.ok{color:#bfffd9}.hidden{display:none!important}
+    .credit{font-size:10.5px;line-height:1.35;color:#758399;margin-top:8px;text-align:right}
+    @media (max-height:720px){.drawer{max-height:49vh}.section p{display:none}.title{font-size:19px}.tab,.chip,.btn{padding:9px 6px}}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="webgl"></canvas>
+    <iframe id="loomisFrame" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+    <div id="loader"><div><b>טוען מודל...</b><br><span id="loaderText">צריך אינטרנט. גרסה מתוקנת: אם נתקע, פתח ב־Safari ולא בתוך Preview של ChatGPT/Files.</span></div></div>
+  </div>
+  <header>
+    <div class="badge" id="modeBadge">MORPH</div>
+    <div>
+      <div class="title">Morph Head Studio</div>
+      <div class="sub">Loomis guides + morph sliders + head pose</div>
+    </div>
+  </header>
+  <section class="drawer">
+    <div class="handle"></div>
+    <div class="tabs">
+      <button class="tab" data-mode="loomis">Loomis 3D</button>
+      <button class="tab" data-mode="facecap">Face Morphs</button>
+      <button class="tab" data-mode="rpm">RPM ARKit</button>
+    </div>
+
+    <div id="morphControls">
+      <div class="row three">
+        <button class="btn" data-camera="front">Front</button>
+        <button class="btn" data-camera="threeq">¾</button>
+        <button class="btn" data-camera="profile">Profile</button>
+      </div>
+      <div class="row three">
+        <button class="btn" data-camera="up">Look Up</button>
+        <button class="btn" data-camera="down">Look Down</button>
+        <button class="btn warn" id="resetBtn">Reset</button>
+      </div>
+
+      <div class="section">
+        <h3>הטיית הראש</h3>
+        <div class="sliders" id="poseSliders"></div>
+      </div>
+
+      <div class="chips" id="catChips"></div>
+
+      <div class="row three">
+        <button class="btn" data-preset="smile">Smile</button>
+        <button class="btn" data-preset="blink">Blink</button>
+        <button class="btn" data-preset="jaw">Jaw</button>
+      </div>
+
+      <div class="section">
+        <h3 id="morphTitle">Morph sliders</h3>
+        <div class="sliders" id="morphList"></div>
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+
+    <div id="loomisControls" class="hidden">
+      <div class="section">
+        <h3>Loomis עם סימונים בנויים במודל</h3>
+        <p>זה המצב הכי נכון לפרופורציות: הסימונים נמצאים בתוך מודל ה־3D עצמו, לא overlay מעל המסך. השתמש בזה למדידת גולגולת, side plane, קו עיניים, גבות, אף וסנטר.</p>
+        <p>בשביל morphs אמיתיים עוברים לטאב Face Morphs או RPM ARKit. אין כרגע מודל ציבורי אחד שמצאתי שיש בו גם Loomis guides וגם morph sliders אנטומיים מלאים.</p>
+      </div>
+    </div>
+
+    <div class="credit" id="credit"></div>
+  </section>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const FACECAP_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/models/gltf/facecap.glb';
+const RPM_URL = 'https://models.readyplayer.me/65a8dba831b23abb4f401bae.glb?quality=high&morphTargets=ARKit,Oculus%20Visemes&textureAtlas=none&useDracoMeshCompression=false';
+const LOOMIS_UID = '3b7c75bc122943959f0d61abac11c413';
+const loomisURL = `https://sketchfab.com/models/${LOOMIS_UID}/embed?autostart=1&preload=1&ui_controls=1&ui_infos=0&ui_inspector=0&ui_hint=0&ui_theme=dark&dnt=1`;
+
+const canvas = document.getElementById('webgl');
+const iframe = document.getElementById('loomisFrame');
+const loaderBox = document.getElementById('loader');
+const loaderText = document.getElementById('loaderText');
+const tabs = [...document.querySelectorAll('.tab')];
+const credit = document.getElementById('credit');
+const status = document.getElementById('status');
+const morphList = document.getElementById('morphList');
+const catChips = document.getElementById('catChips');
+const poseSliders = document.getElementById('poseSliders');
+const morphControls = document.getElementById('morphControls');
+const loomisControls = document.getElementById('loomisControls');
+const modeBadge = document.getElementById('modeBadge');
+const morphTitle = document.getElementById('morphTitle');
+
+let renderer, scene, camera, controls, modelRoot, mixer, clock, ktx2Loader;
+let morphMeshes = [];
+let morphNames = [];
+let currentMode = localStorage.getItem('morphStudioMode') || 'facecap';
+let activeCategory = 'All';
+let pose = { yaw:0, pitch:0, roll:0 };
+let animationId = 0;
+
+const categories = {
+  All: null,
+  Brows: ['brow','eyebrow'],
+  Eyes: ['eye','blink','squint','wide','look'],
+  Nose: ['nose','sneer'],
+  Cheek: ['cheek'],
+  Mouth: ['mouth','jaw','tongue','lip','smile','frown','pucker','funnel']
+};
+
+function initThree(){
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+  ktx2Loader = new KTX2Loader()
+    .setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/libs/basis/')
+    .detectSupport(renderer);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111318);
+
+  camera = new THREE.PerspectiveCamera(35, window.innerWidth/window.innerHeight, 0.01, 100);
+  camera.position.set(0, 0.25, 4.2);
+
+  const environment = new RoomEnvironment(renderer);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(environment, 0.04).texture;
+
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x202838, 1.4);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xffffff, 2.5);
+  key.position.set(2,3,4);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x8edfff, 1.2);
+  rim.position.set(-3,1.5,-2);
+  scene.add(rim);
+
+  modelRoot = new THREE.Group();
+  scene.add(modelRoot);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 0.2, 0);
+  controls.minDistance = 1.1;
+  controls.maxDistance = 8;
+
+  clock = new THREE.Clock();
+  animate();
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if(mixer) mixer.update(dt);
+  controls.update();
+  renderer.render(scene,camera);
+}
+
+window.addEventListener('resize',()=>{
+  if(!renderer) return;
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function setMode(mode){
+  currentMode = mode;
+  localStorage.setItem('morphStudioMode', mode);
+  tabs.forEach(t=>t.classList.toggle('active', t.dataset.mode===mode));
+  modeBadge.textContent = mode==='loomis' ? 'LOOMIS 3D' : mode==='rpm' ? 'ARKit' : 'MORPH';
+
+  if(mode === 'loomis'){
+    canvas.style.display='none';
+    iframe.style.display='block';
+    morphControls.classList.add('hidden');
+    loomisControls.classList.remove('hidden');
+    loaderBox.classList.add('hidden');
+    if(!iframe.src) iframe.src = loomisURL;
+    credit.innerHTML = 'Loomis tab: external Sketchfab model with built-in guidelines. Morph tabs: Three.js/GLB models with morph target sliders.';
+    return;
+  }
+
+  iframe.style.display='none';
+  canvas.style.display='block';
+  morphControls.classList.remove('hidden');
+  loomisControls.classList.add('hidden');
+  loadMorphModel(mode);
+}
+
+function clearModel(){
+  while(modelRoot.children.length){
+    const obj = modelRoot.children.pop();
+    obj.traverse?.(n=>{
+      if(n.geometry) n.geometry.dispose?.();
+      if(n.material){
+        const mats = Array.isArray(n.material) ? n.material : [n.material];
+        mats.forEach(m=>m.dispose?.());
+      }
+    });
+  }
+  mixer = null;
+  morphMeshes = [];
+  morphNames = [];
+  morphList.innerHTML = '';
+  status.textContent = '';
+}
+
+function loadMorphModel(mode){
+  clearModel();
+  loaderBox.classList.remove('hidden');
+  loaderText.textContent = mode === 'rpm' ? 'טוען Ready Player Me avatar עם ARKit morph targets...' : 'טוען Face Cap GLB עם morph targets...';
+  const loader = new GLTFLoader();
+  loader.setKTX2Loader(ktx2Loader);
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  const url = mode === 'rpm' ? RPM_URL : FACECAP_URL;
+  const thisLoad = ++animationId;
+  const stuckTimer = setTimeout(()=>{
+    if(thisLoad === animationId && !loaderBox.classList.contains('hidden')){
+      loaderText.innerHTML = '<span class="error">זה עדיין טוען. בדרך כלל זה אומר שה־Preview של ChatGPT/Files חסם מודולי 3D או CDN. לחץ Share → Open in Safari, או עבור ל־Loomis 3D.</span>';
+    }
+  }, 14000);
+
+  loader.load(url, gltf=>{
+    if(thisLoad !== animationId) return;
+    clearTimeout(stuckTimer);
+    const root = gltf.scene;
+    normalizeModel(root, mode);
+    modelRoot.add(root);
+    mixer = null;
+    // Do not autoplay face animations: sliders must stay under your control.
+    collectMorphTargets(root);
+    buildCategoryChips();
+    buildPoseSliders();
+    buildMorphUI();
+    setCamera('front');
+    loaderBox.classList.add('hidden');
+    credit.innerHTML = mode === 'rpm'
+      ? 'RPM tab loads Ready Player Me GLB using morphTargets=ARKit,Oculus Visemes. This gives real model morph sliders, but not Loomis construction guides.'
+      : 'Face Morphs tab loads the Three.js Face Cap GLB and exposes its real morphTargetDictionary as mobile sliders.';
+  }, p=>{
+    if(p.total) loaderText.textContent = `טוען: ${Math.round(p.loaded/p.total*100)}%`;
+  }, err=>{
+    clearTimeout(stuckTimer);
+    console.error(err);
+    loaderText.innerHTML = '<span class="error">טעינת המודל נכשלה. נסה לפתוח ב־Safari או לעבור לטאב אחר.</span>';
+  });
+}
+
+function normalizeModel(root, mode){
+  root.rotation.set(0,0,0);
+  root.position.set(0,0,0);
+  root.scale.setScalar(1);
+  if(mode === 'facecap'){
+    root.scale.setScalar(2.1);
+    root.position.set(0,-0.18,0);
+  } else {
+    root.scale.setScalar(1.7);
+    root.position.set(0,-1.25,0);
+  }
+  pose = {yaw:0,pitch:0,roll:0};
+  applyPose();
+}
+
+function collectMorphTargets(root){
+  const names = new Set();
+  root.traverse(obj=>{
+    if(obj.isMesh && obj.morphTargetInfluences && obj.morphTargetDictionary){
+      morphMeshes.push(obj);
+      for(const key of Object.keys(obj.morphTargetDictionary)) names.add(cleanName(key));
+    }
+    if(obj.isMesh && obj.material){
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach(m=>{ m.roughness = m.roughness ?? 0.7; });
+    }
+  });
+  // Use raw keys, mapped to cleaned display names later.
+  const raw = new Set();
+  morphMeshes.forEach(mesh=>Object.keys(mesh.morphTargetDictionary).forEach(k=>raw.add(k)));
+  morphNames = [...raw].sort((a,b)=>cleanName(a).localeCompare(cleanName(b)));
+  status.innerHTML = morphNames.length
+    ? `<span class="ok">נמצאו ${morphNames.length} morph targets אמיתיים במודל.</span>`
+    : '<span class="error">לא נמצאו morph targets במודל הזה.</span>';
+}
+
+function cleanName(name){
+  return String(name).replace(/^blendShape1\./,'').replace(/^Wolf3D_Head\./,'').replace(/_/g,' ');
+}
+function lowerName(name){ return cleanName(name).toLowerCase(); }
+
+function buildCategoryChips(){
+  catChips.innerHTML='';
+  for(const key of Object.keys(categories)){
+    const b=document.createElement('button');
+    b.className='chip'+(key===activeCategory?' active':'');
+    b.textContent=key;
+    b.onclick=()=>{activeCategory=key; buildCategoryChips(); buildMorphUI();};
+    catChips.appendChild(b);
+  }
+}
+
+function buildPoseSliders(){
+  poseSliders.innerHTML='';
+  makePoseSlider('Yaw', 'yaw', -60, 60);
+  makePoseSlider('Pitch', 'pitch', -45, 45);
+  makePoseSlider('Roll', 'roll', -35, 35);
+}
+function makePoseSlider(label,key,min,max){
+  const row=document.createElement('div'); row.className='sliderRow';
+  row.innerHTML=`<div class="sliderTop"><span>${label}</span><span class="sliderVal">0°</span></div><input type="range" min="${min}" max="${max}" step="1" value="0">`;
+  const input=row.querySelector('input'); const val=row.querySelector('.sliderVal');
+  input.oninput=()=>{ pose[key]=Number(input.value); val.textContent=pose[key]+'°'; applyPose(); };
+  poseSliders.appendChild(row);
+}
+function applyPose(){
+  if(!modelRoot) return;
+  modelRoot.rotation.set(THREE.MathUtils.degToRad(pose.pitch), THREE.MathUtils.degToRad(pose.yaw), THREE.MathUtils.degToRad(pose.roll));
+}
+
+function buildMorphUI(){
+  morphList.innerHTML='';
+  const needles = categories[activeCategory];
+  const filtered = morphNames.filter(n=>{
+    if(!needles) return true;
+    const l=lowerName(n);
+    return needles.some(s=>l.includes(s));
+  });
+  morphTitle.textContent = `${activeCategory} morph sliders`;
+  if(!filtered.length){
+    morphList.innerHTML='<div class="status">אין sliders בקטגוריה הזאת במודל הנוכחי.</div>';
+    return;
+  }
+  filtered.forEach(rawName=>{
+    const row=document.createElement('div'); row.className='sliderRow';
+    const display=cleanName(rawName);
+    row.innerHTML=`<div class="sliderTop"><span>${display}</span><span class="sliderVal">0.00</span></div><input type="range" min="0" max="1" step="0.01" value="0">`;
+    const input=row.querySelector('input'); const val=row.querySelector('.sliderVal');
+    input.oninput=()=>{ setMorph(rawName, Number(input.value)); val.textContent=Number(input.value).toFixed(2); };
+    morphList.appendChild(row);
+  });
+}
+
+function setMorph(rawName, value){
+  morphMeshes.forEach(mesh=>{
+    const dict=mesh.morphTargetDictionary;
+    if(!dict) return;
+    // Direct match, or cleaned-name match for models that rename prefixes.
+    let idx = dict[rawName];
+    if(idx === undefined){
+      const targetClean = cleanName(rawName);
+      for(const [k,v] of Object.entries(dict)){
+        if(cleanName(k) === targetClean){ idx = v; break; }
+      }
+    }
+    if(idx !== undefined) mesh.morphTargetInfluences[idx] = value;
+  });
+}
+function resetMorphs(){
+  morphMeshes.forEach(mesh=>{
+    if(mesh.morphTargetInfluences) mesh.morphTargetInfluences.fill(0);
+  });
+  buildMorphUI();
+}
+function setBySubstrings(subs, value){
+  morphNames.forEach(n=>{
+    const l=lowerName(n);
+    if(subs.some(s=>l.includes(s))) setMorph(n,value);
+  });
+}
+
+function setPreset(name){
+  resetMorphs();
+  if(name==='smile') setBySubstrings(['smile'], 0.85);
+  if(name==='blink') setBySubstrings(['blink'], 1);
+  if(name==='jaw') setBySubstrings(['jawopen','jaw open','mouthopen','mouth open'], 0.85);
+}
+
+function setCamera(type){
+  const tgt = new THREE.Vector3(0, currentMode==='rpm'?0.25:0.18, 0);
+  const d = currentMode==='rpm'?3.6:3.0;
+  const pos = {
+    front:[0, tgt.y, d],
+    threeq:[-1.65, tgt.y+0.05, 2.55],
+    profile:[-d, tgt.y, 0.05],
+    up:[0, tgt.y+1.0, d*0.78],
+    down:[0, tgt.y-1.0, d*0.78]
+  }[type] || [0,tgt.y,d];
+  camera.position.set(pos[0],pos[1],pos[2]);
+  controls.target.copy(tgt);
+  controls.update();
+}
+
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.querySelectorAll('[data-camera]').forEach(b=>b.onclick=()=>setCamera(b.dataset.camera));
+document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>setPreset(b.dataset.preset));
+document.getElementById('resetBtn').onclick=()=>{ resetMorphs(); pose={yaw:0,pitch:0,roll:0}; buildPoseSliders(); applyPose(); setCamera('front'); };
+
+initThree();
+setMode(currentMode);
+</script>
+</body>
+</html>
