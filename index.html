@@ -1,28 +1,49 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Morph Head Studio</title>
-<style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;overflow:hidden;background:#070a0f;color:#f4f7ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}#app{position:fixed;inset:0;background:#070a0f}.frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#080b10;display:none}.frame.active{display:block}header{position:absolute;z-index:5;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top)) 14px 10px;background:linear-gradient(180deg,rgba(5,7,10,.95),rgba(5,7,10,.35),rgba(5,7,10,0));display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}.title{font-size:20px;font-weight:900;line-height:1.05}.sub{font-size:12px;color:#a7b0c2;margin-top:3px;direction:ltr}.badge{direction:ltr;background:linear-gradient(90deg,#48e58e,#48c9ff);color:#06120c;font-weight:900;border-radius:999px;padding:9px 12px;font-size:12px}.panel{position:absolute;z-index:10;left:0;right:0;bottom:0;padding:10px 12px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(8,10,16,0),rgba(8,10,16,.85) 12%,rgba(8,10,16,.98));backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px);border-top:1px solid rgba(255,255,255,.08)}.handle{width:58px;height:6px;border-radius:999px;background:rgba(255,255,255,.34);margin:0 auto 10px}.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;direction:ltr}.tab{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#fff;border-radius:16px;padding:12px 8px;font-weight:850;font-size:13px;text-align:center}.tab.active{background:linear-gradient(90deg,#48e58e,#48c9ff);color:#06120c;border-color:transparent}.info{margin-top:10px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.045);border-radius:16px;padding:10px;text-align:right;color:#c9d3e6;font-size:12px;line-height:1.35}.info b{color:#dfffe9}.info a{color:#aee9ff;font-weight:800;text-decoration:none}@media(max-height:720px){.info{display:none}.panel{padding-top:8px}.tab{padding:10px 6px}.title{font-size:18px}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Morph Head Studio</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
-<iframe id="morph" class="frame active" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen src="https://threejs.org/examples/webgl_morphtargets_face.html"></iframe>
-<iframe id="loomis" class="frame" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen src="https://sketchfab.com/models/3b7c75bc122943959f0d61abac11c413/embed?autostart=1&preload=1&ui_controls=1&ui_infos=0&ui_inspector=0&ui_hint=0&ui_theme=dark&dnt=1"></iframe>
-<header><div class="badge" id="badge">MORPHS</div><div><div class="title">Morph Head Studio</div><div class="sub">official morphs + Loomis guides</div></div></header>
-<section class="panel">
-<div class="handle"></div>
-<div class="tabs"><button class="tab active" id="morphBtn">Official Morphs</button><button class="tab" id="loomisBtn">Loomis 3D</button></div>
-<div class="info" id="info"><b>זה תיקון זמני אבל יציב:</b> הטאב הזה פותח את דוגמת FaceCap הרשמית של Three.js, ולכן המודל וה־morph targets נטענים מאותו אתר ולא נתקעים בגלל טעינה חיצונית. <a href="https://threejs.org/examples/webgl_morphtargets_face.html" target="_blank" rel="noopener">פתח ישירות</a></div>
-</section>
+  <canvas id="view"></canvas>
+  <div id="loader" class="loader"><div><b>טוען מודל...</b><br><span id="loaderText">מכין ראש Morphable עם סימוני Loomis תלת־ממדיים...</span></div></div>
+  <header>
+    <div class="badge">HYBRID V1</div>
+    <div><div class="title">Morph + Loomis Head</div><div class="sub">one scene · morph sliders · 3D guide cage</div></div>
+  </header>
+  <section class="panel">
+    <div class="handle"></div>
+    <div class="grid cols3">
+      <button class="btn" data-camera="front">Front</button>
+      <button class="btn" data-camera="threeq">¾</button>
+      <button class="btn" data-camera="profile">Profile</button>
+    </div>
+    <div class="grid cols3" style="margin-top:8px">
+      <button class="btn" data-camera="up">Look Up</button>
+      <button class="btn" data-camera="down">Look Down</button>
+      <button class="btn warn" id="resetBtn">Reset</button>
+    </div>
+    <div class="grid cols3" style="margin-top:8px">
+      <button class="btn" id="guidesBtn">Loomis Guides</button>
+      <button class="btn" id="edgeBtn">Edges</button>
+      <button class="btn" id="labelBtn">Labels</button>
+    </div>
+    <div class="section"><h3>הטיית הראש</h3><div class="sliders" id="poseSliders"></div></div>
+    <div class="grid cols4" id="cats" style="margin-top:10px"></div>
+    <div class="grid cols3" style="margin-top:8px">
+      <button class="btn" data-preset="smile">Smile</button>
+      <button class="btn" data-preset="blink">Blink</button>
+      <button class="btn" data-preset="jaw">Jaw</button>
+    </div>
+    <div class="section"><h3>Morph sliders</h3><div class="sliders" id="morphSliders"></div><div class="status" id="status"></div></div>
+    <div class="note">זה כבר לא שני iframes: המודל, הסליידרים וקווי Loomis נמצאים באותה סצנת Three.js. אם Ready Player Me לא ייטען באייפון, השלב הבא הוא להעלות GLB משלנו לריפו.</div>
+  </section>
 </div>
-<script>
-const morph=document.getElementById('morph'), loomis=document.getElementById('loomis'), morphBtn=document.getElementById('morphBtn'), loomisBtn=document.getElementById('loomisBtn'), badge=document.getElementById('badge'), info=document.getElementById('info');
-function setMode(mode){const isMorph=mode==='morph';morph.classList.toggle('active',isMorph);loomis.classList.toggle('active',!isMorph);morphBtn.classList.toggle('active',isMorph);loomisBtn.classList.toggle('active',!isMorph);badge.textContent=isMorph?'MORPHS':'LOOMIS';info.innerHTML=isMorph?'<b>זה תיקון זמני אבל יציב:</b> הטאב הזה פותח את דוגמת FaceCap הרשמית של Three.js, ולכן המודל וה־morph targets נטענים מאותו אתר ולא נתקעים בגלל טעינה חיצונית. <a href="https://threejs.org/examples/webgl_morphtargets_face.html" target="_blank" rel="noopener">פתח ישירות</a>':'<b>Loomis 3D:</b> פה הסימונים בנויים בתוך המודל עצמו, וזה הטאב הנכון לפרופורציות. המורפים נמצאים בטאב השני.';}
-morphBtn.onclick=()=>setMode('morph');loomisBtn.onclick=()=>setMode('loomis');
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
