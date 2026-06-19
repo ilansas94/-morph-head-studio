@@ -1,0 +1,113 @@
+name: Fetch MPFB GLB
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fetch-mpfb-glb.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-mpfb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download TalkingHead MPFB GLB
+        run: |
+          set -euo pipefail
+          mkdir -p assets/morph-loomis-head public/models src/assets
+          URL="https://raw.githubusercontent.com/met4citizen/TalkingHead/main/avatars/mpfb.glb"
+          curl -L --fail --retry 3 --retry-delay 2 "$URL" -o /tmp/mpfb.glb
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct, json
+          p = Path('/tmp/mpfb.glb')
+          b = p.read_bytes()
+          if len(b) < 20:
+              raise SystemExit('downloaded GLB is too small')
+          magic, version, declared_len = struct.unpack_from('<III', b, 0)
+          if magic != 0x46546C67:
+              raise SystemExit('downloaded file is not GLB')
+          if version != 2:
+              raise SystemExit(f'unsupported GLB version {version}')
+          if declared_len != len(b):
+              raise SystemExit(f'GLB length mismatch declared={declared_len} actual={len(b)}')
+          off = 12
+          json_chunk = None
+          while off + 8 <= len(b):
+              chunk_len, chunk_type = struct.unpack_from('<II', b, off)
+              off += 8
+              chunk = b[off:off+chunk_len]
+              off += chunk_len
+              if chunk_type == 0x4E4F534A:
+                  json_chunk = json.loads(chunk.decode('utf-8').rstrip(' \t\r\n\x00'))
+          if json_chunk is None:
+              raise SystemExit('no JSON chunk')
+          target_count = 0
+          for mesh in json_chunk.get('meshes', []):
+              for prim in mesh.get('primitives', []):
+                  target_count += len(prim.get('targets', []))
+          print('OK GLB bytes:', len(b))
+          print('Mesh count:', len(json_chunk.get('meshes', [])))
+          print('Primitive morph target entries:', target_count)
+          PY
+          cp /tmp/mpfb.glb assets/morph-loomis-head/mpfb.glb
+          cp /tmp/mpfb.glb assets/morph-loomis-head/morph_loomis_head_arkit_oculus.glb
+          cp /tmp/mpfb.glb public/models/mpfb.glb
+          cp /tmp/mpfb.glb public/models/morph_loomis_head_arkit_oculus.glb
+          cp /tmp/mpfb.glb src/assets/mpfb.glb
+          cp /tmp/mpfb.glb src/assets/morph_loomis_head_arkit_oculus.glb
+
+      - name: Write asset report
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct, json, hashlib
+          p = Path('assets/morph-loomis-head/morph_loomis_head_arkit_oculus.glb')
+          b = p.read_bytes()
+          off = 12
+          js = None
+          while off + 8 <= len(b):
+              n, t = struct.unpack_from('<II', b, off)
+              off += 8
+              c = b[off:off+n]
+              off += n
+              if t == 0x4E4F534A:
+                  js = json.loads(c.decode('utf-8').rstrip(' \t\r\n\x00'))
+          target_names = []
+          target_entries = 0
+          for mesh in js.get('meshes', []):
+              target_names += mesh.get('extras', {}).get('targetNames', []) or mesh.get('targetNames', []) or []
+              for prim in mesh.get('primitives', []):
+                  target_entries += len(prim.get('targets', []))
+          report = {
+              'source': 'https://github.com/met4citizen/TalkingHead/blob/main/avatars/mpfb.glb',
+              'file': 'morph_loomis_head_arkit_oculus.glb',
+              'size_bytes': len(b),
+              'sha256': hashlib.sha256(b).hexdigest(),
+              'mesh_count': len(js.get('meshes', [])),
+              'target_name_count': len(target_names),
+              'primitive_target_entries': target_entries,
+              'generator': js.get('asset', {}).get('generator'),
+              'license_note': 'TalkingHead README describes avatars/mpfb.glb as CC0.'
+          }
+          Path('assets/morph-loomis-head/morph_asset_report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+          print(json.dumps(report, indent=2))
+          PY
+
+      - name: Commit downloaded GLB
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/morph-loomis-head public/models src/assets
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Replace GLB with TalkingHead MPFB asset"
+            git push
+          fi
