@@ -7,5 +7,6 @@
   "target_name_count": 155,
   "primitive_target_entries": 155,
   "generator": "Khronos glTF Blender I/O v5.0.21",
-  "license_note": "TalkingHead README describes avatars/mpfb.glb as CC0."
+  "license_note": "TalkingHead README describes avatars/mpfb.glb as CC0.",
+  "trigger": "manual second push"
 }
