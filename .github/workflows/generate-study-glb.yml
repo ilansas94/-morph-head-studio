@@ -27,212 +27,100 @@ jobs:
 
           class GLB:
               def __init__(self):
-                  self.bin = bytearray()
-                  self.bufferViews = []
-                  self.accessors = []
-                  self.meshes = []
-                  self.nodes = []
-                  self.materials = []
-
-              def add_mat(self, name, color):
-                  self.materials.append({
-                      'name': name,
-                      'doubleSided': True,
-                      'pbrMetallicRoughness': {
-                          'baseColorFactor': color,
-                          'metallicFactor': 0,
-                          'roughnessFactor': .78
-                      }
-                  })
-                  return len(self.materials)-1
-
-              def add_buffer(self, data, target=None):
-                  while len(self.bin) % 4:
-                      self.bin.append(0)
-                  off = len(self.bin)
-                  self.bin.extend(data)
-                  view = {'buffer':0, 'byteOffset':off, 'byteLength':len(data)}
-                  if target: view['target'] = target
-                  self.bufferViews.append(view)
-                  return len(self.bufferViews)-1
-
-              def add_accessor(self, arr, componentType, typ, target=None, mins=None, maxs=None):
-                  if componentType == 5126:
-                      data = struct.pack('<' + 'f'*len(arr), *arr)
-                  elif componentType == 5123:
-                      data = struct.pack('<' + 'H'*len(arr), *arr)
-                  else:
-                      raise ValueError(componentType)
-                  bv = self.add_buffer(data, target)
-                  count = len(arr) // {'SCALAR':1,'VEC2':2,'VEC3':3}[typ]
-                  acc = {'bufferView': bv, 'componentType': componentType, 'count': count, 'type': typ}
-                  if mins is not None: acc['min'] = mins
-                  if maxs is not None: acc['max'] = maxs
-                  self.accessors.append(acc)
-                  return len(self.accessors)-1
-
-              def add_mesh(self, name, verts, inds, mat):
-                  flat = [v for p in verts for v in p]
-                  mins = [min(p[i] for p in verts) for i in range(3)]
-                  maxs = [max(p[i] for p in verts) for i in range(3)]
-                  pos = self.add_accessor(flat, 5126, 'VEC3', 34962, mins, maxs)
-                  ind = self.add_accessor(inds, 5123, 'SCALAR', 34963, [min(inds)], [max(inds)])
-                  self.meshes.append({'name':name, 'primitives':[{'attributes':{'POSITION':pos}, 'indices':ind, 'material':mat}]})
-                  return len(self.meshes)-1
-
-              def add_node(self, name, mesh=None, t=(0,0,0), s=(1,1,1), r=None):
-                  node = {'name': name, 'translation': list(t), 'scale': list(s)}
-                  if mesh is not None: node['mesh'] = mesh
-                  if r is not None: node['rotation'] = list(r)
-                  self.nodes.append(node)
-                  return len(self.nodes)-1
-
-              def write(self, path, root_children):
-                  self.nodes.insert(0, {'name':'Study_Planes_Head_Root', 'children':[i+1 for i in root_children]})
-                  gltf = {
-                      'asset': {'version':'2.0', 'generator':'ChatGPT Head Model Study generator'},
-                      'scene': 0,
-                      'scenes': [{'nodes':[0]}],
-                      'nodes': self.nodes,
-                      'meshes': self.meshes,
-                      'materials': self.materials,
-                      'buffers': [{'byteLength': len(self.bin)}],
-                      'bufferViews': self.bufferViews,
-                      'accessors': self.accessors
-                  }
-                  js = align4(json.dumps(gltf, separators=(',',':')).encode('utf8'))
-                  binchunk = align4(bytes(self.bin))
-                  total = 12 + 8 + len(js) + 8 + len(binchunk)
-                  out = bytearray()
-                  out += struct.pack('<III', 0x46546C67, 2, total)
-                  out += struct.pack('<II', len(js), 0x4E4F534A) + js
-                  out += struct.pack('<II', len(binchunk), 0x004E4942) + binchunk
-                  Path(path).write_bytes(out)
-                  return out
+                  self.bin = bytearray(); self.bufferViews=[]; self.accessors=[]; self.meshes=[]; self.nodes=[]; self.materials=[]
+              def add_mat(self,name,color):
+                  self.materials.append({'name':name,'doubleSided':True,'pbrMetallicRoughness':{'baseColorFactor':color,'metallicFactor':0,'roughnessFactor':.78}}); return len(self.materials)-1
+              def add_buffer(self,data,target=None):
+                  while len(self.bin)%4: self.bin.append(0)
+                  off=len(self.bin); self.bin.extend(data); view={'buffer':0,'byteOffset':off,'byteLength':len(data)}
+                  if target: view['target']=target
+                  self.bufferViews.append(view); return len(self.bufferViews)-1
+              def add_accessor(self,arr,componentType,typ,target=None,mins=None,maxs=None):
+                  data=struct.pack('<' + ('f' if componentType==5126 else 'H')*len(arr), *arr)
+                  bv=self.add_buffer(data,target); comps={'SCALAR':1,'VEC2':2,'VEC3':3}[typ]
+                  acc={'bufferView':bv,'componentType':componentType,'count':len(arr)//comps,'type':typ}
+                  if mins is not None: acc['min']=mins
+                  if maxs is not None: acc['max']=maxs
+                  self.accessors.append(acc); return len(self.accessors)-1
+              def add_mesh(self,name,verts,inds,mat):
+                  flat=[x for p in verts for x in p]; mins=[min(p[i] for p in verts) for i in range(3)]; maxs=[max(p[i] for p in verts) for i in range(3)]
+                  pos=self.add_accessor(flat,5126,'VEC3',34962,mins,maxs); ind=self.add_accessor(inds,5123,'SCALAR',34963,[min(inds)],[max(inds)])
+                  self.meshes.append({'name':name,'primitives':[{'attributes':{'POSITION':pos},'indices':ind,'material':mat}]}); return len(self.meshes)-1
+              def add_node(self,name,mesh=None,t=(0,0,0),s=(1,1,1),r=None):
+                  node={'name':name,'translation':list(t),'scale':list(s)}
+                  if mesh is not None: node['mesh']=mesh
+                  if r is not None: node['rotation']=list(r)
+                  self.nodes.append(node); return len(self.nodes)-1
+              def write(self,path,children):
+                  self.nodes.insert(0,{'name':'Study_Planes_Head_Root','children':[i+1 for i in children]})
+                  gltf={'asset':{'version':'2.0','generator':'ChatGPT Head Model Study generator'},'scene':0,'scenes':[{'nodes':[0]}],'nodes':self.nodes,'meshes':self.meshes,'materials':self.materials,'buffers':[{'byteLength':len(self.bin)}],'bufferViews':self.bufferViews,'accessors':self.accessors}
+                  js=align4(json.dumps(gltf,separators=(',',':')).encode()); binchunk=align4(bytes(self.bin)); total=12+8+len(js)+8+len(binchunk)
+                  out=struct.pack('<III',0x46546C67,2,total)+struct.pack('<II',len(js),0x4E4F534A)+js+struct.pack('<II',len(binchunk),0x004E4942)+binchunk
+                  Path(path).write_bytes(out); return out
 
           def box(w,h,d):
               x,y,z=w/2,h/2,d/2
-              v=[(-x,-y,-z),(x,-y,-z),(x,y,-z),(-x,y,-z),(-x,-y,z),(x,-y,z),(x,y,z),(-x,y,z)]
-              i=[0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,4,3,4,0]
-              return v,i
-
-          def cone(radius, height, n=7):
-              v=[(0,height/2,0)]
+              return [(-x,-y,-z),(x,-y,-z),(x,y,-z),(-x,y,-z),(-x,-y,z),(x,-y,z),(x,y,z),(-x,y,z)], [0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,4,3,4,0]
+          def cone(radius,height,n=7):
+              v=[(0,height/2,0)]+[(math.cos(2*math.pi*k/n)*radius,-height/2,math.sin(2*math.pi*k/n)*radius) for k in range(n)]+[(0,-height/2,0)]
+              c=len(v)-1; ind=[]
               for k in range(n):
-                  a=2*math.pi*k/n
-                  v.append((math.cos(a)*radius, -height/2, math.sin(a)*radius))
-              v.append((0,-height/2,0)); c=len(v)-1
-              inds=[]
-              for k in range(n):
-                  a=1+k; b=1+((k+1)%n)
-                  inds += [0,a,b, c,b,a]
-              return v,inds
-
-          def cylinder(r1, r2, h, n=8):
+                  a=1+k; b=1+(k+1)%n; ind += [0,a,b,c,b,a]
+              return v,ind
+          def cylinder(r1,r2,h,n=8):
               v=[]
               for y,r in [(-h/2,r1),(h/2,r2)]:
                   for k in range(n):
                       a=2*math.pi*k/n; v.append((math.cos(a)*r,y,math.sin(a)*r))
-              v += [(0,-h/2,0),(0,h/2,0)]
-              cb,ct=2*n,2*n+1
-              inds=[]
+              v += [(0,-h/2,0),(0,h/2,0)]; cb,ct=2*n,2*n+1; ind=[]
               for k in range(n):
-                  a=k; b=(k+1)%n; c=n+k; d=n+(k+1)%n
-                  inds += [a,c,b, b,c,d, cb,b,a, ct,c,d]
-              return v,inds
-
-          def sphere(rx, ry, rz, seg=10, rings=6):
-              v=[]
+                  a=k; b=(k+1)%n; c=n+k; d=n+(k+1)%n; ind += [a,c,b,b,c,d,cb,b,a,ct,c,d]
+              return v,ind
+          def sphere(rx,ry,rz,seg=10,rings=6):
+              v=[]; ind=[]
               for j in range(rings+1):
-                  ph=-math.pi/2 + math.pi*j/rings
+                  ph=-math.pi/2+math.pi*j/rings
                   for k in range(seg):
-                      th=2*math.pi*k/seg
-                      v.append((math.cos(ph)*math.cos(th)*rx, math.sin(ph)*ry, math.cos(ph)*math.sin(th)*rz))
-              inds=[]
+                      th=2*math.pi*k/seg; v.append((math.cos(ph)*math.cos(th)*rx,math.sin(ph)*ry,math.cos(ph)*math.sin(th)*rz))
               for j in range(rings):
                   for k in range(seg):
-                      a=j*seg+k; b=j*seg+(k+1)%seg; c=(j+1)*seg+k; d=(j+1)*seg+(k+1)%seg
-                      inds += [a,c,b,b,c,d]
-              return v,inds
+                      a=j*seg+k; b=j*seg+(k+1)%seg; c=(j+1)*seg+k; d=(j+1)*seg+(k+1)%seg; ind += [a,c,b,b,c,d]
+              return v,ind
 
-          g=GLB()
-          skin=g.add_mat('asaro grey skin',[0.34,0.37,0.43,1])
-          light=g.add_mat('light planes',[0.83,0.87,0.90,1])
-          dark=g.add_mat('dark planes',[0.17,0.18,0.21,1])
-          mid=g.add_mat('mid planes',[0.55,0.60,0.66,1])
-          brown=g.add_mat('brown planes',[0.28,0.23,0.19,1])
-
-          meshes={}
-          meshes['cranium']=g.add_mesh('mesh_cranium',*sphere(.72,.95,.58,10,6),skin)
-          meshes['face']=g.add_mesh('mesh_face_planes',*cone(.72,1.20,7),skin)
-          meshes['jaw']=g.add_mesh('mesh_jaw_block',*box(.82,.44,.52),skin)
-          meshes['brow']=g.add_mesh('mesh_brow_plane',*box(.38,.10,.12),dark)
-          meshes['eye']=g.add_mesh('mesh_eye_plane',*box(.38,.12,.08),light)
-          meshes['cheek']=g.add_mesh('mesh_cheek_plane',*box(.34,.36,.11),mid)
-          meshes['nose']=g.add_mesh('mesh_nose_wedge',*cone(.20,.55,4),light)
-          meshes['nose_bottom']=g.add_mesh('mesh_nose_bottom',*box(.26,.10,.14),brown)
-          meshes['lip_up']=g.add_mesh('mesh_upper_lip',*box(.44,.06,.10),brown)
-          meshes['lip_low']=g.add_mesh('mesh_lower_lip',*box(.36,.08,.10),brown)
-          meshes['ear']=g.add_mesh('mesh_ear_ring',*cylinder(.17,.17,.08,12),skin)
-          meshes['neck']=g.add_mesh('mesh_neck_planes',*cylinder(.38,.30,.80,8),skin)
-          meshes['shoulder']=g.add_mesh('mesh_shoulder_base',*cylinder(.95,1.10,.28,8),skin)
-
+          g=GLB(); skin=g.add_mat('asaro grey skin',[.34,.37,.43,1]); light=g.add_mat('light planes',[.83,.87,.90,1]); dark=g.add_mat('dark planes',[.17,.18,.21,1]); mid=g.add_mat('mid planes',[.55,.60,.66,1]); brown=g.add_mat('brown planes',[.28,.23,.19,1])
+          m={}
+          m['cranium']=g.add_mesh('mesh_cranium',*sphere(.72,.95,.58,10,6),skin); m['face']=g.add_mesh('mesh_face_planes',*cone(.72,1.20,7),skin); m['jaw']=g.add_mesh('mesh_jaw_block',*box(.82,.44,.52),skin)
+          m['brow']=g.add_mesh('mesh_brow_plane',*box(.38,.10,.12),dark); m['eye']=g.add_mesh('mesh_eye_plane',*box(.38,.12,.08),light); m['cheek']=g.add_mesh('mesh_cheek_plane',*box(.34,.36,.11),mid)
+          m['nose']=g.add_mesh('mesh_nose_wedge',*cone(.20,.55,4),light); m['nose_bottom']=g.add_mesh('mesh_nose_bottom',*box(.26,.10,.14),brown); m['lip_up']=g.add_mesh('mesh_upper_lip',*box(.44,.06,.10),brown); m['lip_low']=g.add_mesh('mesh_lower_lip',*box(.36,.08,.10),brown)
+          m['ear']=g.add_mesh('mesh_ear_ring',*cylinder(.17,.17,.08,12),skin); m['neck']=g.add_mesh('mesh_neck_planes',*cylinder(.38,.30,.80,8),skin); m['shoulder']=g.add_mesh('mesh_shoulder_base',*cylinder(.95,1.10,.28,8),skin)
           nodes=[]
-          nodes.append(g.add_node('part_cranium',meshes['cranium'],(0,1.55,0)))
-          nodes.append(g.add_node('part_face_planes',meshes['face'],(0,.92,.04),(.88,1.02,.72)))
-          nodes.append(g.add_node('part_jaw_block',meshes['jaw'],(0,.50,.02)))
-          nodes.append(g.add_node('part_brow_L',meshes['brow'],(-.25,1.35,.48), r=(0,0,-.035,0.999)))
-          nodes.append(g.add_node('part_brow_R',meshes['brow'],(.25,1.35,.48), r=(0,0,.035,0.999)))
-          nodes.append(g.add_node('part_eye_L',meshes['eye'],(-.25,1.18,.52)))
-          nodes.append(g.add_node('part_eye_R',meshes['eye'],(.25,1.18,.52)))
-          nodes.append(g.add_node('part_cheek_L',meshes['cheek'],(-.34,.95,.50), r=(0,0,.09,.996)))
-          nodes.append(g.add_node('part_cheek_R',meshes['cheek'],(.34,.95,.50), r=(0,0,-.09,.996)))
-          nodes.append(g.add_node('part_nose_wedge',meshes['nose'],(0,.99,.58),(.70,1,1), r=(.653,.271,.271,.653)))
-          nodes.append(g.add_node('part_nose_bottom',meshes['nose_bottom'],(0,.82,.56)))
-          nodes.append(g.add_node('part_upper_lip',meshes['lip_up'],(0,.61,.50)))
-          nodes.append(g.add_node('part_lower_lip',meshes['lip_low'],(0,.44,.46)))
-          nodes.append(g.add_node('part_ear_L',meshes['ear'],(-.73,1.06,.02),(1,1,1), r=(0,.707,0,.707)))
-          nodes.append(g.add_node('part_ear_R',meshes['ear'],(.73,1.06,.02),(1,1,1), r=(0,.707,0,.707)))
-          nodes.append(g.add_node('part_neck_planes',meshes['neck'],(0,.02,0),(.92,1,.78)))
-          nodes.append(g.add_node('part_shoulder_base',meshes['shoulder'],(0,-.43,0),(1.15,.55,.80)))
-
-          Path('assets/models').mkdir(parents=True, exist_ok=True)
-          Path('public/models').mkdir(parents=True, exist_ok=True)
-          data=g.write('assets/models/study-planes-head.glb', nodes)
-          Path('public/models/study-planes-head.glb').write_bytes(data)
-          report={'file':'assets/models/study-planes-head.glb','size_bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'nodes':len(nodes),'meshes':len(g.meshes),'note':'Physical binary GLB generated in GitHub Actions. No base64 at runtime.'}
+          add=lambda *a,**k: nodes.append(g.add_node(*a,**k))
+          add('part_cranium',m['cranium'],(0,1.55,0)); add('part_face_planes',m['face'],(0,.92,.04),(.88,1.02,.72)); add('part_jaw_block',m['jaw'],(0,.50,.02))
+          add('part_brow_L',m['brow'],(-.25,1.35,.48),r=(0,0,-.035,.999)); add('part_brow_R',m['brow'],(.25,1.35,.48),r=(0,0,.035,.999)); add('part_eye_L',m['eye'],(-.25,1.18,.52)); add('part_eye_R',m['eye'],(.25,1.18,.52))
+          add('part_cheek_L',m['cheek'],(-.34,.95,.50),r=(0,0,.09,.996)); add('part_cheek_R',m['cheek'],(.34,.95,.50),r=(0,0,-.09,.996)); add('part_nose_wedge',m['nose'],(0,.99,.58),(.70,1,1),r=(.653,.271,.271,.653)); add('part_nose_bottom',m['nose_bottom'],(0,.82,.56)); add('part_upper_lip',m['lip_up'],(0,.61,.50)); add('part_lower_lip',m['lip_low'],(0,.44,.46)); add('part_ear_L',m['ear'],(-.73,1.06,.02),r=(0,.707,0,.707)); add('part_ear_R',m['ear'],(.73,1.06,.02),r=(0,.707,0,.707)); add('part_neck_planes',m['neck'],(0,.02,0),(.92,1,.78)); add('part_shoulder_base',m['shoulder'],(0,-.43,0),(1.15,.55,.80))
+          Path('assets/models').mkdir(parents=True,exist_ok=True); Path('public/models').mkdir(parents=True,exist_ok=True)
+          data=g.write('assets/models/study-planes-head.glb',nodes); Path('public/models/study-planes-head.glb').write_bytes(data)
+          report={'file':'assets/models/study-planes-head.glb','size_bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'nodes':len(nodes),'meshes':len(g.meshes),'runtime':'physical binary GLB, no base64'}
           Path('assets/models/study-planes-head-report.json').write_text(json.dumps(report,indent=2),encoding='utf8')
           print(json.dumps(report,indent=2))
           PY
-
       - name: Validate GLB
         run: |
           python3 - <<'PY'
           import struct, json
-          from pathlib import Path
-          p=Path('assets/models/study-planes-head.glb')
-          b=p.read_bytes()
-          magic,version,length=struct.unpack_from('<III',b,0)
-          assert magic==0x46546C67 and version==2 and length==len(b), (magic,version,length,len(b))
-          off=12; found_json=False; found_bin=False
+          b=open('assets/models/study-planes-head.glb','rb').read(); magic,version,length=struct.unpack_from('<III',b,0)
+          assert magic==0x46546C67 and version==2 and length==len(b)
+          off=12; js=None; gotbin=False
           while off+8<=len(b):
-              n,t=struct.unpack_from('<II',b,off); off+=8
-              c=b[off:off+n]; off+=n
-              if t==0x4E4F534A:
-                  found_json=True; js=json.loads(c.decode('utf8').rstrip(' \t\n\r\0'))
-              if t==0x004E4942: found_bin=True
-          assert found_json and found_bin
+              n,t=struct.unpack_from('<II',b,off); off+=8; c=b[off:off+n]; off+=n
+              if t==0x4E4F534A: js=json.loads(c.decode().rstrip(' \t\n\r\0'))
+              if t==0x004E4942: gotbin=True
+          assert js and gotbin
           print('validated', len(b), 'nodes', len(js['nodes']), 'meshes', len(js['meshes']))
           PY
-
       - name: Commit study GLB
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add assets/models/study-planes-head.glb public/models/study-planes-head.glb assets/models/study-planes-head-report.json
-          if git diff --cached --quiet; then
-            echo "No changes"
-          else
-            git commit -m "Generate physical study planes GLB"
-            git push
-          fi
+          if git diff --cached --quiet; then echo "No changes"; else git commit -m "Generate physical study planes GLB"; git push; fi
