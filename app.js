@@ -1,9 +1,8 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/controls/OrbitControls.js';
-import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/environments/RoomEnvironment.js';
 
-const LOCAL_GLB = './assets/morph-loomis-head/morph_loomis_head_arkit_oculus.glb?v=external-v4';
+const LOCAL_GLB = './assets/morph-loomis-head/morph_loomis_head_arkit_oculus.glb?v=external-custom-v5';
 
 const canvas = document.getElementById('view');
 const loader = document.getElementById('loader');
@@ -89,12 +88,18 @@ function animate(){ requestAnimationFrame(animate); controls.update(); renderer.
 
 async function loadExternalGLB(){
   loader.classList.remove('hide');
-  loaderText.textContent = 'טוען את קובץ ה־GLB החיצוני מהריפו...';
+  loaderText.textContent = 'מוריד את קובץ ה־GLB החיצוני מהריפו...';
   try {
-    const arrayBuffer = await fetchArrayBufferWithTimeout(LOCAL_GLB, 12000);
-    loaderText.textContent = `ה־GLB ירד (${Math.round(arrayBuffer.byteLength/1024)}KB), מפענח morph targets...`;
-    const gltf = await parseGLBWithTimeout(arrayBuffer, 12000);
-    setupModel(gltf.scene, arrayBuffer.byteLength);
+    const arrayBuffer = await loadArrayBufferXHR(LOCAL_GLB, progress => {
+      if(progress.total){
+        loaderText.textContent = `מוריד GLB חיצוני: ${Math.round(progress.loaded / progress.total * 100)}%`;
+      } else {
+        loaderText.textContent = `מוריד GLB חיצוני: ${Math.round(progress.loaded / 1024)}KB`;
+      }
+    }, 15000);
+    loaderText.textContent = `ה־GLB ירד (${Math.round(arrayBuffer.byteLength/1024)}KB), קורא אותו בלי GLTFLoader...`;
+    const root = parseGlbToThree(arrayBuffer);
+    setupModel(root, arrayBuffer.byteLength);
     loader.classList.add('hide');
   } catch (err) {
     console.error(err);
@@ -103,24 +108,210 @@ async function loadExternalGLB(){
   }
 }
 
-async function fetchArrayBufferWithTimeout(url, ms){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  try {
-    const res = await fetch(url, { cache:'no-store', signal: controller.signal });
-    if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    return await res.arrayBuffer();
-  } finally {
-    clearTimeout(timer);
-  }
+function loadArrayBufferXHR(url, onProgress, timeoutMs){
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'arraybuffer';
+    xhr.timeout = timeoutMs;
+    xhr.onprogress = e => onProgress?.({ loaded:e.loaded || 0, total:e.lengthComputable ? e.total : 0 });
+    xhr.onload = () => {
+      if(xhr.status >= 200 && xhr.status < 300 && xhr.response){
+        resolve(xhr.response);
+      } else {
+        reject(new Error(`HTTP ${xhr.status || 'unknown'}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('network error loading external GLB'));
+    xhr.ontimeout = () => reject(new Error('timeout loading external GLB'));
+    xhr.send();
+  });
 }
 
-function parseGLBWithTimeout(arrayBuffer, ms){
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('GLTFLoader parse timeout')), ms);
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.parse(arrayBuffer, '', gltf => { clearTimeout(timer); resolve(gltf); }, err => { clearTimeout(timer); reject(err); });
-  });
+function parseGlbToThree(arrayBuffer){
+  const dv = new DataView(arrayBuffer);
+  if(dv.getUint32(0, true) !== 0x46546c67) throw new Error('not a GLB file');
+  if(dv.getUint32(4, true) !== 2) throw new Error('unsupported GLB version');
+  const totalLength = dv.getUint32(8, true);
+  if(totalLength > arrayBuffer.byteLength) throw new Error('truncated GLB file');
+
+  let offset = 12;
+  let json = null;
+  let binStart = 0;
+  let binLength = 0;
+  while(offset + 8 <= totalLength){
+    const chunkLength = dv.getUint32(offset, true); offset += 4;
+    const chunkType = dv.getUint32(offset, true); offset += 4;
+    if(chunkType === 0x4E4F534A){
+      const bytes = new Uint8Array(arrayBuffer, offset, chunkLength);
+      json = JSON.parse(new TextDecoder().decode(bytes).trim());
+    } else if(chunkType === 0x004E4942){
+      binStart = offset;
+      binLength = chunkLength;
+    }
+    offset += chunkLength;
+  }
+  if(!json) throw new Error('GLB has no JSON chunk');
+  if(!binStart || !binLength) throw new Error('GLB has no BIN chunk');
+
+  const accessorCache = new Map();
+  const meshCache = new Map();
+
+  function numComps(type){ return ({SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT2:4,MAT3:9,MAT4:16})[type] || 1; }
+  function compBytes(componentType){ return ({5120:1,5121:1,5122:2,5123:2,5125:4,5126:4})[componentType] || 4; }
+  function arrayClass(componentType){ return ({5120:Int8Array,5121:Uint8Array,5122:Int16Array,5123:Uint16Array,5125:Uint32Array,5126:Float32Array})[componentType] || Float32Array; }
+  function readComp(view, byteOffset, componentType){
+    switch(componentType){
+      case 5120: return view.getInt8(byteOffset);
+      case 5121: return view.getUint8(byteOffset);
+      case 5122: return view.getInt16(byteOffset, true);
+      case 5123: return view.getUint16(byteOffset, true);
+      case 5125: return view.getUint32(byteOffset, true);
+      case 5126: return view.getFloat32(byteOffset, true);
+      default: throw new Error(`unsupported component type ${componentType}`);
+    }
+  }
+  function accessorByteOffset(acc){
+    const bv = json.bufferViews?.[acc.bufferView];
+    if(!bv) return null;
+    return binStart + (bv.byteOffset || 0) + (acc.byteOffset || 0);
+  }
+  function readAccessor(index){
+    if(accessorCache.has(index)) return accessorCache.get(index);
+    const acc = json.accessors[index];
+    if(!acc) throw new Error(`missing accessor ${index}`);
+    const comps = numComps(acc.type);
+    const total = acc.count * comps;
+    const Out = arrayClass(acc.componentType);
+    const out = new Out(total);
+    const size = compBytes(acc.componentType);
+
+    if(acc.bufferView !== undefined){
+      const bv = json.bufferViews[acc.bufferView];
+      const start = accessorByteOffset(acc);
+      const stride = bv.byteStride || comps * size;
+      for(let i=0;i<acc.count;i++){
+        const row = start + i * stride;
+        for(let c=0;c<comps;c++) out[i*comps+c] = readComp(dv, row + c * size, acc.componentType);
+      }
+    }
+
+    if(acc.sparse){
+      const sparse = acc.sparse;
+      const idxDef = sparse.indices;
+      const valDef = sparse.values;
+      const idxBv = json.bufferViews[idxDef.bufferView];
+      const valBv = json.bufferViews[valDef.bufferView];
+      const idxStart = binStart + (idxBv.byteOffset || 0) + (idxDef.byteOffset || 0);
+      const valStart = binStart + (valBv.byteOffset || 0) + (valDef.byteOffset || 0);
+      const idxSize = compBytes(idxDef.componentType);
+      const valSize = compBytes(acc.componentType);
+      const valStride = valBv.byteStride || comps * valSize;
+      for(let i=0;i<sparse.count;i++){
+        const dst = readComp(dv, idxStart + i * idxSize, idxDef.componentType);
+        const src = valStart + i * valStride;
+        for(let c=0;c<comps;c++) out[dst*comps+c] = readComp(dv, src + c * valSize, acc.componentType);
+      }
+    }
+
+    accessorCache.set(index, out);
+    return out;
+  }
+
+  function materialFor(index, isLine){
+    const def = json.materials?.[index] || {};
+    const pbr = def.pbrMetallicRoughness || {};
+    const color = pbr.baseColorFactor || [0.82,0.66,0.56,1];
+    const matColor = new THREE.Color(color[0], color[1], color[2]);
+    if(isLine){
+      return new THREE.LineBasicMaterial({ color: matColor, transparent: color[3] < 1, opacity: color[3] ?? 1, depthTest:false });
+    }
+    const transparent = def.alphaMode === 'BLEND' || color[3] < 1;
+    return new THREE.MeshStandardMaterial({
+      color: matColor,
+      opacity: color[3] ?? 1,
+      transparent,
+      depthWrite: !transparent,
+      roughness: pbr.roughnessFactor ?? .78,
+      metalness: pbr.metallicFactor ?? 0,
+      side: def.doubleSided ? THREE.DoubleSide : THREE.FrontSide
+    });
+  }
+
+  function buildMesh(meshIndex){
+    if(meshCache.has(meshIndex)) return meshCache.get(meshIndex).clone(true);
+    const meshDef = json.meshes[meshIndex];
+    const group = new THREE.Group();
+    group.name = meshDef.name || `mesh_${meshIndex}`;
+    const targetNames = meshDef.extras?.targetNames || meshDef.targetNames || [];
+
+    for(const prim of meshDef.primitives || []){
+      const mode = prim.mode ?? 4;
+      const geom = new THREE.BufferGeometry();
+      const pos = readAccessor(prim.attributes.POSITION);
+      geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      if(prim.attributes.NORMAL !== undefined){
+        geom.setAttribute('normal', new THREE.BufferAttribute(readAccessor(prim.attributes.NORMAL), 3));
+      }
+      if(prim.indices !== undefined){
+        geom.setIndex(new THREE.BufferAttribute(readAccessor(prim.indices), 1));
+      }
+      if(prim.targets?.length){
+        geom.morphTargetsRelative = true;
+        geom.morphAttributes.position = prim.targets.map((t, i) => {
+          const attr = new THREE.BufferAttribute(readAccessor(t.POSITION), 3);
+          attr.name = targetNames[i] || `target_${i}`;
+          return attr;
+        });
+      }
+      if(!geom.attributes.normal && mode === 4) geom.computeVertexNormals();
+
+      let obj;
+      if(mode === 1){
+        obj = new THREE.LineSegments(geom, materialFor(prim.material, true));
+        obj.userData.edge = false;
+      } else {
+        obj = new THREE.Mesh(geom, materialFor(prim.material, false));
+        if(geom.morphAttributes.position?.length){
+          obj.updateMorphTargets();
+          obj.morphTargetDictionary = {};
+          obj.morphTargetInfluences = [];
+          geom.morphAttributes.position.forEach((attr, i) => {
+            obj.morphTargetDictionary[attr.name] = i;
+            obj.morphTargetInfluences[i] = meshDef.weights?.[i] || 0;
+          });
+        }
+      }
+      obj.name = prim.name || group.name;
+      group.add(obj);
+    }
+    meshCache.set(meshIndex, group);
+    return group.clone(true);
+  }
+
+  function buildNode(nodeIndex){
+    const node = json.nodes[nodeIndex];
+    const obj = node.mesh !== undefined ? buildMesh(node.mesh) : new THREE.Group();
+    obj.name = node.name || obj.name || `node_${nodeIndex}`;
+    if(node.matrix){
+      const m = new THREE.Matrix4();
+      m.fromArray(node.matrix);
+      obj.applyMatrix4(m);
+    } else {
+      if(node.translation) obj.position.fromArray(node.translation);
+      if(node.rotation) obj.quaternion.fromArray(node.rotation);
+      if(node.scale) obj.scale.fromArray(node.scale);
+    }
+    for(const child of node.children || []) obj.add(buildNode(child));
+    return obj;
+  }
+
+  const sceneIndex = json.scene || 0;
+  const sceneDef = json.scenes?.[sceneIndex];
+  const root = new THREE.Group();
+  root.name = 'External_GLB_Root';
+  for(const nodeIndex of sceneDef?.nodes || [0]) root.add(buildNode(nodeIndex));
+  return root;
 }
 
 function setupModel(root, byteLength){
@@ -129,8 +320,6 @@ function setupModel(root, byteLength){
   root.traverse(o=>{
     if(o.isMesh){
       o.frustumCulled = false;
-      const mats = Array.isArray(o.material) ? o.material : [o.material];
-      mats.forEach(m=>{ if(m){ if('roughness' in m) m.roughness=.72; if('metalness' in m) m.metalness=0; m.side = THREE.DoubleSide; } });
       if(o.morphTargetDictionary && o.morphTargetInfluences){
         morphMeshes.push(o);
         Object.keys(o.morphTargetDictionary).forEach(k=>morphNames.push(k));
@@ -152,8 +341,8 @@ function setupModel(root, byteLength){
   setCamera('front');
 
   statusEl.innerHTML = morphNames.length
-    ? `<span class="ok">נטען GLB חיצוני מהריפו (${Math.round(byteLength/1024)}KB). נמצאו ${morphNames.length} morph targets.</span>`
-    : `<span class="err">ה־GLB החיצוני נטען, אבל לא נמצאו morph targets.</span>`;
+    ? `<span class="ok">נטען הקובץ החיצוני מהריפו (${Math.round(byteLength/1024)}KB). נמצאו ${morphNames.length} morph targets.</span>`
+    : `<span class="err">הקובץ החיצוני נטען, אבל לא נמצאו morph targets.</span>`;
 }
 
 function normalizeToView(root){
