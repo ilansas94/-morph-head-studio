@@ -1,1 +1,11 @@
-{"file":"morph_loomis_head_arkit_oculus.glb","size_bytes":13608,"blendshape_count":72,"arkit_52":true,"ovr_15":true,"license":"CC0 procedural prototype"}
+{
+  "source": "https://github.com/met4citizen/TalkingHead/blob/main/avatars/mpfb.glb",
+  "file": "morph_loomis_head_arkit_oculus.glb",
+  "size_bytes": 36815920,
+  "sha256": "63c645a2a863b9972e9a9c2ed576a1de4c390b8475508e1473e69c87a3ee299c",
+  "mesh_count": 8,
+  "target_name_count": 155,
+  "primitive_target_entries": 155,
+  "generator": "Khronos glTF Blender I/O v5.0.21",
+  "license_note": "TalkingHead README describes avatars/mpfb.glb as CC0."
+}
