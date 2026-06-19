@@ -6,14 +6,22 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Morph Head Studio</title>
-  <link rel="stylesheet" href="style.css?v=external-custom-v5">
+  <link rel="stylesheet" href="style.css?v=external-custom-v6">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
 <div id="app">
   <canvas id="view"></canvas>
   <div id="loader" class="loader"><div><b>טוען GLB חיצוני...</b><br><span id="loaderText">טוען את הקובץ מהריפו...</span></div></div>
   <header>
-    <div class="badge">EXTERNAL CUSTOM V5</div>
+    <div class="badge">EXTERNAL WATCH V6</div>
     <div><div class="title">Morph + Loomis Head</div><div class="sub">one scene · morph sliders · 3D guide cage</div></div>
   </header>
   <section class="panel">
@@ -41,9 +49,46 @@
       <button class="btn" data-preset="jaw">Jaw</button>
     </div>
     <div class="section"><h3>Morph sliders</h3><div class="sliders" id="morphSliders"></div><div class="status" id="status"></div></div>
-    <div class="note">מצב זה טוען את קובץ ה־GLB החיצוני מהריפו ומציג אותו באותה סצנה.</div>
+    <div class="note">מצב זה טוען את קובץ ה־GLB החיצוני מהריפו. V6 כולל watchdog שתופס גם תקיעה בטעינת imports לפני שהאפליקציה מתחילה לרוץ.</div>
   </section>
 </div>
-<script type="module" src="app.js?v=external-custom-v5"></script>
+<script type="module">
+  const loader = document.getElementById('loader');
+  const loaderText = document.getElementById('loaderText');
+  const statusEl = document.getElementById('status');
+
+  function showBootError(message){
+    if(loader) loader.classList.add('hide');
+    if(statusEl){
+      statusEl.innerHTML = '<span class="err">' + message + '</span>';
+    }
+  }
+
+  window.addEventListener('error', event => {
+    showBootError('שגיאת JavaScript לפני טעינת המודל: ' + (event.message || 'unknown error'));
+  });
+
+  window.addEventListener('unhandledrejection', event => {
+    const reason = event.reason && (event.reason.message || String(event.reason));
+    showBootError('שגיאת Promise לפני טעינת המודל: ' + (reason || 'unknown error'));
+  });
+
+  if(loaderText) loaderText.textContent = 'מפעיל app.js ובודק imports...';
+
+  const bootTimer = setTimeout(() => {
+    if(loader && !loader.classList.contains('hide')){
+      showBootError('app.js או אחד ה־imports נתקע לפני שהגיע לטעינת ה־GLB. זה כבר לא ה־GLB עצמו אלא טעינת Three/OrbitControls מה־CDN.');
+    }
+  }, 18000);
+
+  import('./app.js?v=external-custom-v6')
+    .then(() => {
+      // app.js ממשיך לנהל את טעינת ה־GLB וה־loader בעצמו.
+    })
+    .catch(error => {
+      clearTimeout(bootTimer);
+      showBootError('app.js לא נטען: ' + (error && error.message ? error.message : String(error)));
+    });
+</script>
 </body>
 </html>
