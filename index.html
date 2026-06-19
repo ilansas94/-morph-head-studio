@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Morph Head Studio</title>
-<link rel="stylesheet" href="style.css?v=mpfb-v9">
+<link rel="stylesheet" href="style.css?v=mpfb-v10">
 </head>
 <body>
 <div id="app">
 <canvas id="view"></canvas>
-<div id="loader" class="loader"><div><b>Loading real mpfb.glb...</b><br><span id="loaderText">Starting...</span></div></div>
-<header><div class="badge">MPFB VISIBLE V9</div><div><div class="title">Morph + Loomis Head</div><div class="sub">one scene · morph sliders · 3D guide cage</div></div></header>
+<div id="loader" class="loader"><div><b>Loading real mpfb.glb...</b><br><span id="loaderText">Starting V10...</span></div></div>
+<header><div class="badge">MPFB VISIBLE V10</div><div><div class="title">Morph + Loomis Head</div><div class="sub">one scene · morph sliders · 3D guide cage</div></div></header>
 <section class="panel">
 <div class="handle"></div>
 <div class="grid cols3"><button class="btn" data-camera="front">Front</button><button class="btn" data-camera="threeq">¾</button><button class="btn" data-camera="profile">Profile</button></div>
@@ -20,9 +20,9 @@
 <div class="grid cols4" id="cats" style="margin-top:10px"></div>
 <div class="grid cols3" style="margin-top:8px"><button class="btn" data-preset="smile">Smile</button><button class="btn" data-preset="blink">Blink</button><button class="btn" data-preset="jaw">Jaw</button></div>
 <div class="section"><h3>Morph sliders</h3><div class="sliders" id="morphSliders"></div><div class="status" id="status"></div></div>
-<div class="note">V9 loads the real mpfb.glb and forces it visible with solid material and bounds.</div>
+<div class="note">V10 loads the real mpfb.glb using bundled ESM modules and forces it visible.</div>
 </section>
 </div>
-<script type="module" src="app-mpfb-v9.js?v=mpfb-v9"></script>
+<script type="module" src="app-mpfb-v10.js?v=mpfb-v10"></script>
 </body>
 </html>
