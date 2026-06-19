@@ -1,0 +1,33 @@
+name: Apply V8 Index
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/apply-v8-index.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write index html
+        run: |
+          cat > /tmp/index.b64 <<'B64'
+PCFkb2N0eXBlIGh0bWw+CjxodG1sIGxhbmc9ImhlIiBkaXI9InJ0bCI+CjxoZWFkPgo8bWV0YSBjaGFyc2V0PSJ1dGYtOCI+CjxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MSwgdmlld3BvcnQtZml0PWNvdmVyIj4KPHRpdGxlPk1vcnBoIEhlYWQgU3R1ZGlvPC90aXRsZT4KPGxpbmsgcmVsPSJzdHlsZXNoZWV0IiBocmVmPSJzdHlsZS5jc3M/dj1tcGZiLXZpc2libGUtdjgiPgo8c2NyaXB0IHR5cGU9ImltcG9ydG1hcCI+eyJpbXBvcnRzIjp7InRocmVlIjoiaHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L25wbS90aHJlZUAwLjE2MC4xL2J1aWxkL3RocmVlLm1vZHVsZS5qcyIsInRocmVlL2FkZG9ucy8iOiJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvbnBtL3RocmVlQDAuMTYwLjEvZXhhbXBsZXMvanNtLyJ9fTwvc2NyaXB0Pgo8L2hlYWQ+Cjxib2R5Pgo8ZGl2IGlkPSJhcHAiPgo8Y2FudmFzIGlkPSJ2aWV3Ij48L2NhbnZhcz4KPGRpdiBpZD0ibG9hZGVyIiBjbGFzcz0ibG9hZGVyIj48ZGl2PjxiPkxvYWRpbmcgbXBmYi5nbGIuLi48L2I+PGJyPjxzcGFuIGlkPSJsb2FkZXJUZXh0Ij5TdGFydGluZy4uLjwvc3Bhbj48L2Rpdj48L2Rpdj4KPGhlYWRlcj48ZGl2IGNsYXNzPSJiYWRnZSI+TVBGQiBWSVNJQkxFIFY4PC9kaXY+PGRpdj48ZGl2IGNsYXNzPSJ0aXRsZSI+TW9ycGggKyBMb29taXMgSGVhZDwvZGl2PjxkaXYgY2xhc3M9InN1YiI+b25lIHNjZW5lIMO3IG1vcnBoIHNsaWRlcnMgwrcgM0QgZ3VpZGUgY2FnZTwvZGl2PjwvZGl2PjwvaGVhZGVyPgo8c2VjdGlvbiBjbGFzcz0icGFuZWwiPgo8ZGl2IGNsYXNzPSJoYW5kbGUiPjwvZGl2Pgo8ZGl2IGNsYXNzPSJncmlkIGNvbHMzIj48YnV0dG9uIGNsYXNzPSJidG4iIGRhdGEtY2FtZXJhPSJmcm9udCI+RnJvbnQ8L2J1dHRvbj48YnV0dG9uIGNsYXNzPSJidG4iIGRhdGEtY2FtZXJhPSJ0aHJlZXEiPsK+PC9idXR0b24+PGJ1dHRvbiBjbGFzcz0iYnRuIiBkYXRhLWNhbWVyYT0icHJvZmlsZSI+UHJvZmlsZTwvYnV0dG9uPjwvZGl2Pgo8ZGl2IGNsYXNzPSJncmlkIGNvbHMzIiBzdHlsZT0ibWFyZ2luLXRvcDo4cHgiPjxidXR0b24gY2xhc3M9ImJ0biIgZGF0YS1jYW1lcmE9InVwIj5Mb29rIFVwPC9idXR0b24+PGJ1dHRvbiBjbGFzcz0iYnRuIiBkYXRhLWNhbWVyYT0iZG93biI+TG9vayBEb3duPC9idXR0b24+PGJ1dHRvbiBjbGFzcz0iYnRuIHdhcm4iIGlkPSJyZXNldEJ0biI+UmVzZXQ8L2J1dHRvbj48L2Rpdj4KPGRpdiBjbGFzcz0iZ3JpZCBjb2xzMyIgc3R5bGU9Im1hcmdpbi10b3A6OHB4Ij48YnV0dG9uIGNsYXNzPSJidG4iIGlkPSJndWlkZXNCdG4iPkxvb21pcyBHdWlkZXM8L2J1dHRvbj48YnV0dG9uIGNsYXNzPSJidG4iIGlkPSJlZGdlQnRuIj5FZGdlczwvYnV0dG9uPjxidXR0b24gY2xhc3M9ImJ0biIgaWQ9ImxhYmVsQnRuIj5MYWJlbHM8L2J1dHRvbj48L2Rpdj4KPGRpdiBjbGFzcz0ic2VjdGlvbiI+PGgzPteU15jXmdeZ16og15TXqNeQ16k8L2gzPjxkaXYgY2xhc3M9InNsaWRlcnMiIGlkPSJwb3NlU2xpZGVycyI+PC9kaXY+PC9kaXY+CjxkaXYgY2xhc3M9ImdyaWQgY29sczQiIGlkPSJjYXRzIiBzdHlsZT0ibWFyZ2luLXRvcDoxMHB4Ij48L2Rpdj4KPGRpdiBjbGFzcz0iZ3JpZCBjb2xzMyIgc3R5bGU9Im1hcmdpbi10b3A6OHB4Ij48YnV0dG9uIGNsYXNzPSJidG4iIGRhdGEtcHJlc2V0PSJzbWlsZSI+U21pbGU8L2J1dHRvbj48YnV0dG9uIGNsYXNzPSJidG4iIGRhdGEtcHJlc2V0PSJibGluayI+Qmxpbms8L2J1dHRvbj48YnV0dG9uIGNsYXNzPSJidG4iIGRhdGEtcHJlc2V0PSJqYXciPkphdzwvYnV0dG9uPjwvZGl2Pgo8ZGl2IGNsYXNzPSJzZWN0aW9uIj48aDM+TW9ycGggc2xpZGVyczwvaDM+PGRpdiBjbGFzcz0ic2xpZGVycyIgaWQ9Im1vcnBoU2xpZGVycyI+PC9kaXY+PGRpdiBjbGFzcz0ic3RhdHVzIiBpZD0ic3RhdHVzIj48L2Rpdj48L2Rpdj4KPGRpdiBjbGFzcz0ibm90ZSI+VjggbG9hZHMgdGhlIHJlYWwgbXBmYi5nbGIgYW5kIHNob3dzIG1lc2ggYW5kIG1vcnBoIGNvdW50cy48L2Rpdj4KPC9zZWN0aW9uPgo8L2Rpdj4KPHNjcmlwdCB0eXBlPSJtb2R1bGUiIHNyYz0iYXBwLW1wZmItdjguanM/dj1tcGZiLXZpc2libGUtdjgiPjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4K
+B64
+          base64 -d /tmp/index.b64 > index.html
+      - name: Commit index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No index changes"
+          else
+            git commit -m "Switch index to visible MPFB viewer v8"
+            git push
+          fi
