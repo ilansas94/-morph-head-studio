@@ -93,7 +93,8 @@ jobs:
               'target_name_count': len(target_names),
               'primitive_target_entries': target_entries,
               'generator': js.get('asset', {}).get('generator'),
-              'license_note': 'TalkingHead README describes avatars/mpfb.glb as CC0.'
+              'license_note': 'TalkingHead README describes avatars/mpfb.glb as CC0.',
+              'trigger': 'manual second push'
           }
           Path('assets/morph-loomis-head/morph_asset_report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
           print(json.dumps(report, indent=2))
