@@ -1,13 +1,13 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/environments/RoomEnvironment.js';
 
-const TARGET_NAMES = [
-  'eyeBlinkLeft','eyeBlinkRight','eyeLookDownLeft','eyeLookDownRight','eyeLookInLeft','eyeLookInRight','eyeLookOutLeft','eyeLookOutRight','eyeLookUpLeft','eyeLookUpRight','eyeSquintLeft','eyeSquintRight','eyeWideLeft','eyeWideRight','jawForward','jawLeft','jawRight','jawOpen','mouthClose','mouthFunnel','mouthPucker','mouthLeft','mouthRight','mouthSmileLeft','mouthSmileRight','mouthFrownLeft','mouthFrownRight','mouthDimpleLeft','mouthDimpleRight','mouthStretchLeft','mouthStretchRight','mouthRollLower','mouthRollUpper','mouthShrugLower','mouthShrugUpper','mouthPressLeft','mouthPressRight','mouthLowerDownLeft','mouthLowerDownRight','mouthUpperUpLeft','mouthUpperUpRight','browDownLeft','browDownRight','browInnerUp','browOuterUpLeft','browOuterUpRight','cheekPuff','cheekSquintLeft','cheekSquintRight','noseSneerLeft','noseSneerRight','tongueOut','viseme_sil','viseme_PP','viseme_FF','viseme_TH','viseme_DD','viseme_kk','viseme_CH','viseme_SS','viseme_nn','viseme_RR','viseme_aa','viseme_E','viseme_I','viseme_O','viseme_U','mouthOpen','mouthSmile','eyesClosed','eyesLookUp','eyesLookDown'
-];
+const LOCAL_GLB = './assets/morph-loomis-head/morph_loomis_head_arkit_oculus.glb?v=external-v4';
 
 const canvas = document.getElementById('view');
 const loader = document.getElementById('loader');
+const loaderText = document.getElementById('loaderText');
 const statusEl = document.getElementById('status');
 const poseEl = document.getElementById('poseSliders');
 const morphEl = document.getElementById('morphSliders');
@@ -30,12 +30,8 @@ const cats = {
   Cheek: ['cheek']
 };
 
-window.addEventListener('error', e => showFatal(e.message || String(e.error || e)));
-window.addEventListener('unhandledrejection', e => showFatal(String(e.reason?.message || e.reason || e)));
-
 init();
-setupModel(createHeadAsset());
-loader.classList.add('hide');
+loadExternalGLB();
 
 function init(){
   renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
@@ -47,7 +43,7 @@ function init(){
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x111318);
   camera = new THREE.PerspectiveCamera(34, innerWidth/innerHeight, 0.01, 100);
-  camera.position.set(0, 1.18, 3.0);
+  camera.position.set(0, 1.05, 3.0);
 
   try {
     const env = new RoomEnvironment(renderer);
@@ -66,7 +62,7 @@ function init(){
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.target.set(0, .78, 0);
+  controls.target.set(0, .95, 0);
   controls.minDistance = 1.0;
   controls.maxDistance = 6;
 
@@ -91,8 +87,45 @@ function init(){
 
 function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
 
-function setupModel(root){
+async function loadExternalGLB(){
+  loader.classList.remove('hide');
+  loaderText.textContent = 'טוען את קובץ ה־GLB החיצוני מהריפו...';
+  try {
+    const arrayBuffer = await fetchArrayBufferWithTimeout(LOCAL_GLB, 12000);
+    loaderText.textContent = `ה־GLB ירד (${Math.round(arrayBuffer.byteLength/1024)}KB), מפענח morph targets...`;
+    const gltf = await parseGLBWithTimeout(arrayBuffer, 12000);
+    setupModel(gltf.scene, arrayBuffer.byteLength);
+    loader.classList.add('hide');
+  } catch (err) {
+    console.error(err);
+    loader.classList.add('hide');
+    statusEl.innerHTML = `<span class="err">ה־GLB החיצוני לא נטען: ${escapeHtml(err.message || String(err))}</span><br><span class="status">קובץ שנבדק: assets/morph-loomis-head/morph_loomis_head_arkit_oculus.glb</span>`;
+  }
+}
+
+async function fetchArrayBufferWithTimeout(url, ms){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const res = await fetch(url, { cache:'no-store', signal: controller.signal });
+    if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    return await res.arrayBuffer();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parseGLBWithTimeout(arrayBuffer, ms){
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('GLTFLoader parse timeout')), ms);
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.parse(arrayBuffer, '', gltf => { clearTimeout(timer); resolve(gltf); }, err => { clearTimeout(timer); reject(err); });
+  });
+}
+
+function setupModel(root, byteLength){
   modelRoot.clear(); guideGroup.clear(); labelGroup.clear(); morphMeshes=[]; morphNames=[];
+
   root.traverse(o=>{
     if(o.isMesh){
       o.frustumCulled = false;
@@ -104,128 +137,36 @@ function setupModel(root){
       }
     }
   });
+
   morphNames = [...new Set(morphNames)].sort((a,b)=>clean(a).localeCompare(clean(b)));
   modelRoot.add(root);
-  buildLoomisGuides(1.16, 1.05);
+  normalizeToView(root);
+
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const headY = box.min.y + size.y * .62;
+  const headH = size.y * .62;
+  buildLoomisGuides(headY, headH);
   setEdges(true);
   buildMorphSliders();
   setCamera('front');
-  statusEl.innerHTML = `<span class="ok">נטען ראש פנימי יציב. נמצאו ${morphNames.length} morph targets עם שמות ARKit/Oculus. עכשיו אין תלות ב־GLB חיצוני ואין לואדר שנתקע.</span>`;
+
+  statusEl.innerHTML = morphNames.length
+    ? `<span class="ok">נטען GLB חיצוני מהריפו (${Math.round(byteLength/1024)}KB). נמצאו ${morphNames.length} morph targets.</span>`
+    : `<span class="err">ה־GLB החיצוני נטען, אבל לא נמצאו morph targets.</span>`;
 }
 
-function createHeadAsset(){
-  const root = new THREE.Group();
-  root.name = 'Internal_Morph_Loomis_Head';
-
-  const headGeo = new THREE.SphereGeometry(.58, 56, 36);
-  headGeo.scale(.73, 1.05, .63);
-  headGeo.translate(0, 1.18, 0);
-  headGeo.morphTargetsRelative = true;
-  headGeo.morphAttributes.position = TARGET_NAMES.map(name=>{
-    const attr = new THREE.Float32BufferAttribute(makeMorphDelta(headGeo.attributes.position, name), 3);
-    attr.name = name;
-    return attr;
-  });
-  const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color:0xd7ad99, roughness:.78, metalness:0 }));
-  head.name = 'Head_ARKit_OVR_Morphs';
-  head.updateMorphTargets();
-  root.add(head);
-
-  const jaw = new THREE.Mesh(new THREE.SphereGeometry(.36, 32, 16), new THREE.MeshStandardMaterial({ color:0xd0a18e, roughness:.8, metalness:0 }));
-  jaw.name = 'Jaw_Form';
-  jaw.scale.set(.95,.42,.70);
-  jaw.position.set(0,.72,.02);
-  root.add(jaw);
-
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.22,.31,.68,36), new THREE.MeshStandardMaterial({ color:0xc99f8c, roughness:.8, metalness:0 }));
-  neck.name = 'Neck';
-  neck.position.y = .25;
-  root.add(neck);
-
-  const eyeMat = new THREE.MeshBasicMaterial({ color:0x151515 });
-  [-.20,.20].forEach((x,i)=>{
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(.038,20,10), eyeMat);
-    eye.name = i ? 'Eye_R' : 'Eye_L';
-    eye.position.set(x,1.34,.40);
-    eye.scale.set(1.75,.62,.45);
-    root.add(eye);
-  });
-
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(.065,.20,28), new THREE.MeshStandardMaterial({ color:0xc99784, roughness:.8, metalness:0 }));
-  nose.name = 'Nose_Form';
-  nose.rotation.x = Math.PI/2;
-  nose.position.set(0,1.13,.47);
-  root.add(nose);
-
-  const mouth = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.18,.88,.43), new THREE.Vector3(.18,.88,.43)]),
-    new THREE.LineBasicMaterial({ color:0x4b1f25, transparent:true, opacity:.85 })
-  );
-  mouth.name = 'Mouth_Line';
-  root.add(mouth);
-
-  return root;
-}
-
-function makeMorphDelta(pos, name){
-  const key = name.toLowerCase();
-  const out = new Float32Array(pos.count * 3);
-  for(let i=0;i<pos.count;i++){
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const front = smooth(z, .10, .50);
-    const lower = smooth(1.05-y, .0, .60);
-    const upper = smooth(y-1.28, .0, .60);
-    const mouth = front * smooth(.25-Math.abs(y-.90), 0, .25);
-    const eyes = front * smooth(.22-Math.abs(y-1.34), 0, .22);
-    const brow = front * smooth(.18-Math.abs(y-1.52), 0, .18);
-    const cheek = front * smooth(.22-Math.abs(y-1.12), 0, .22) * smooth(Math.abs(x)-.12, 0, .40);
-    const left = smooth(-x, 0, .50);
-    const right = smooth(x, 0, .50);
-    let dx=0, dy=0, dz=0;
-
-    if(key.includes('jawopen') || key.includes('mouthopen') || key.includes('viseme_aa')) { dy -= lower*.18; dz += mouth*.055; }
-    if(key.includes('jawforward')) dz += lower*.12;
-    if(key.includes('jawleft')) dx -= lower*.10;
-    if(key.includes('jawright')) dx += lower*.10;
-    if(key.includes('smile')) dy += mouth*.13;
-    if(key.includes('frown')) dy -= mouth*.11;
-    if(key.includes('pucker') || key.includes('funnel') || key.includes('viseme_o') || key.includes('viseme_u')) { dz += mouth*.14; dx += -Math.sign(x)*mouth*.050; }
-    if(key.includes('stretch') || key.includes('viseme_e') || key.includes('viseme_i')) dx += Math.sign(x)*mouth*.080;
-    if(key.includes('mouthleft')) dx -= mouth*.10;
-    if(key.includes('mouthright')) dx += mouth*.10;
-    if(key.includes('close') || key.includes('press') || key.includes('roll')) dy += (y>.9?-1:1)*mouth*.050;
-    if(key.includes('upperup')) dy += mouth*upper*.12;
-    if(key.includes('lowerdown')) dy -= mouth*lower*.12;
-    if(key.includes('blink') || key.includes('eyesclosed')) dy -= eyes*.085;
-    if(key.includes('wide')) dy += eyes*.075;
-    if(key.includes('lookupleft')) dy += eyes*left*.065;
-    if(key.includes('lookupright')) dy += eyes*right*.065;
-    if(key.includes('lookdownleft')) dy -= eyes*left*.065;
-    if(key.includes('lookdownright')) dy -= eyes*right*.065;
-    if(key.includes('lookinleft')) dx += eyes*left*.060;
-    if(key.includes('lookinright')) dx -= eyes*right*.060;
-    if(key.includes('lookoutleft')) dx -= eyes*left*.060;
-    if(key.includes('lookoutright')) dx += eyes*right*.060;
-    if(key.includes('squint')) dy -= eyes*.050;
-    if(key.includes('browinnerup')) dy += brow*(1-smooth(Math.abs(x),.05,.34))*.12;
-    if(key.includes('browouterup')) dy += brow*smooth(Math.abs(x),.08,.36)*.10;
-    if(key.includes('browdown')) dy -= brow*.09;
-    if(key.includes('cheekpuff')) dz += cheek*.11;
-    if(key.includes('cheeksquint')) dy += cheek*.065;
-    if(key.includes('nosesneer')) dy += front*smooth(.16-Math.abs(y-1.12),0,.16)*.09;
-    if(key.includes('tongueout')) dz += mouth*.20;
-    if(key.includes('viseme_pp') || key.includes('viseme_ff')) dz += mouth*.05;
-    if(key.includes('eyeslookup')) dy += eyes*.065;
-    if(key.includes('eyeslookdown')) dy -= eyes*.065;
-
-    out[i*3] = dx; out[i*3+1] = dy; out[i*3+2] = dz;
-  }
-  return out;
-}
-
-function smooth(v, edge0, edge1){
-  const t = Math.min(1, Math.max(0, (v-edge0)/(edge1-edge0 || 1)));
-  return t*t*(3-2*t);
+function normalizeToView(root){
+  let box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3(); box.getSize(size);
+  if(!Number.isFinite(size.y) || size.y <= 0.0001) throw new Error('empty GLB bounds');
+  const scale = 2.25 / size.y;
+  root.scale.multiplyScalar(scale);
+  box = new THREE.Box3().setFromObject(root);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  root.position.x -= center.x;
+  root.position.y += .95 - center.y;
+  root.position.z -= center.z;
 }
 
 function buildLoomisGuides(y, h){
@@ -309,11 +250,8 @@ function applyPose(){ rig.rotation.set(THREE.MathUtils.degToRad(pose.pitch),THRE
 function resetAll(){ morphMeshes.forEach(m=>m.morphTargetInfluences?.fill(0)); pose={yaw:0,pitch:0,roll:0}; rig.rotation.set(0,0,0); buildPoseSliders(); buildMorphSliders(); setCamera('front'); }
 function preset(p){ morphMeshes.forEach(m=>m.morphTargetInfluences?.fill(0)); const keys={smile:['smile'],blink:['blink','eyesclosed'],jaw:['jaw','mouthopen','mouth open','viseme aa']}; morphNames.forEach(n=>{ const l=lower(n); if(keys[p].some(s=>l.includes(s))) setMorph(n,.85); }); buildMorphSliders(); }
 function setCamera(type){
-  const t=new THREE.Vector3(0,.78,0), d=2.55;
-  const map={front:[0,1.16,d],threeq:[-1.25,1.18,2.05],profile:[-d,1.12,.03],up:[0,1.78,d*.72],down:[0,.48,d*.72]};
+  const t=new THREE.Vector3(0,.95,0), d=2.55;
+  const map={front:[0,1.05,d],threeq:[-1.25,1.08,2.05],profile:[-d,1.05,.03],up:[0,1.68,d*.72],down:[0,.35,d*.72]};
   camera.position.set(...(map[type]||map.front)); controls.target.copy(t); controls.update();
 }
-function showFatal(msg){
-  if(loader) loader.classList.add('hide');
-  if(statusEl) statusEl.innerHTML = `<span class="err">שגיאת JavaScript: ${String(msg).slice(0,160)}</span>`;
-}
+function escapeHtml(s){ return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
