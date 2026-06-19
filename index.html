@@ -6,14 +6,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Morph Head Studio</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260619c">
 </head>
 <body>
 <div id="app">
   <canvas id="view"></canvas>
   <div id="loader" class="loader"><div><b>טוען מודל...</b><br><span id="loaderText">מכין ראש Morphable עם סימוני Loomis תלת־ממדיים...</span></div></div>
   <header>
-    <div class="badge">HYBRID V1</div>
+    <div class="badge">LOCAL GLB V2</div>
     <div><div class="title">Morph + Loomis Head</div><div class="sub">one scene · morph sliders · 3D guide cage</div></div>
   </header>
   <section class="panel">
@@ -41,9 +41,9 @@
       <button class="btn" data-preset="jaw">Jaw</button>
     </div>
     <div class="section"><h3>Morph sliders</h3><div class="sliders" id="morphSliders"></div><div class="status" id="status"></div></div>
-    <div class="note">זה כבר לא שני iframes: המודל, הסליידרים וקווי Loomis נמצאים באותה סצנת Three.js. אם Ready Player Me לא ייטען באייפון, השלב הבא הוא להעלות GLB משלנו לריפו.</div>
+    <div class="note">האתר טוען קודם את קובץ ה־GLB המקומי מהריפו. אם הדפדפן חוסם אותו, יש fallback פנימי כדי שלא יישאר מסך ריק.</div>
   </section>
 </div>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20260619c"></script>
 </body>
 </html>
