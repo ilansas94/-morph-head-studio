@@ -1,38 +1,13 @@
 <!doctype html>
 <html lang="he" dir="rtl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#202026">
-  <title>Head Model Study</title>
-  <link rel="stylesheet" href="style.css?v=head-study-v1">
-</head>
-<body>
-<div id="app">
-  <canvas id="view"></canvas>
-  <div id="loader" class="loader hide"><div><b>Loading...</b><br><span id="loaderText">Starting...</span></div></div>
-
-  <header class="topbar">
-    <button class="icon-btn" id="gearBtn" aria-label="settings">⚙</button>
-    <div class="brand">
-      <div class="title">Head Model Study</div>
-      <div class="sub">real external model · loomis / asaro / planes</div>
-    </div>
-    <div class="top-actions">
-      <button class="icon-btn" id="camBtn" aria-label="camera">◉</button>
-      <button class="icon-btn wide" id="modelBtn" aria-label="model"><span id="modelName">STUDY</span></button>
-    </div>
-  </header>
-
-  <section class="sheet">
-    <div class="grab"></div>
-    <div class="mode-tabs" id="modeTabs"></div>
-    <div class="action-row" id="actionRow"></div>
-    <h1 id="sheetTitle">Loomis Head</h1>
-    <p id="sheetDesc"></p>
-    <div id="sheetBody"></div>
-  </section>
-</div>
-<script type="module" src="head-studio-v1.js?v=head-study-v1"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#070b16" />
+    <title>Morph Head Studio</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

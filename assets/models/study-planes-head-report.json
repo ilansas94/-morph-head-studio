@@ -1,8 +1,0 @@
-{
-  "file": "assets/models/study-planes-head.glb",
-  "size_bytes": 12628,
-  "sha256": "7fe72b8b3ccffbf491dec9be26b448f850b82cdb29e0baf817dc24ad6b202726",
-  "nodes": 17,
-  "meshes": 13,
-  "runtime": "physical binary GLB, no base64"
-}
