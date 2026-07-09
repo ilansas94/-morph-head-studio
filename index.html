@@ -1,13 +1,405 @@
 <!doctype html>
 <html lang="he" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#070b16" />
-    <title>Morph Head Studio</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#070b16" />
+  <title>Morph Head Studio</title>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%;margin:0;overflow:hidden;background:#070b16;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+    button,input{font:inherit}
+    #app{position:fixed;inset:0;background:radial-gradient(circle at 50% 18%,#1b2745 0,#070b16 62%)}
+    #stage{position:absolute;inset:0 0 42vh 0;touch-action:none;overflow:hidden}
+    #canvasHost{position:absolute;inset:0}
+    #boot{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:28px;color:#dbeafe;pointer-events:none}
+    #boot b{display:block;font-size:18px;margin-bottom:8px;color:#fff}
+    #panel{position:absolute;left:0;right:0;bottom:0;height:45vh;display:flex;flex-direction:column;gap:10px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(7,11,22,.99));border-radius:24px 24px 0 0;border-top:1px solid rgba(255,255,255,.16);box-shadow:0 -18px 60px rgba(0,0,0,.45)}
+    #grab{width:46px;height:5px;border-radius:999px;background:rgba(255,255,255,.32);margin:0 auto 2px;flex:0 0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto}
+    h1{font-size:18px;line-height:1;margin:0 0 5px;color:#fff}
+    #status{font-size:12px;color:#aab4d4;min-height:16px;direction:rtl;text-align:right}
+    .upload{direction:ltr;background:#7dd3fc;color:#062033;font-weight:900;border-radius:14px;padding:10px 12px;font-size:12px;white-space:nowrap;box-shadow:0 8px 24px rgba(125,211,252,.18)}
+    .upload input{display:none}
+    .row{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;flex:0 0 auto;padding-bottom:1px;direction:ltr}
+    button{border:1px solid rgba(255,255,255,.16);background:#172033;color:#dbeafe;border-radius:12px;padding:9px 12px;font-weight:800;white-space:nowrap;min-height:36px}
+    button.on{background:#7dd3fc;color:#061726;border-color:#7dd3fc}
+    button.warn{background:#3b1d25;color:#fecaca}
+    #sliders{overflow:auto;padding:2px 2px 8px;display:flex;flex-direction:column;gap:10px;direction:ltr;min-height:0}
+    .slider{display:grid;grid-template-columns:minmax(120px,1fr) 1.35fr 34px;align-items:center;gap:10px;color:#dce7ff;font-size:11px;text-align:left}
+    .slider span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .slider output{text-align:right;color:#9fb1da;font-variant-numeric:tabular-nums}
+    input[type=range]{width:100%;accent-color:#7dd3fc}
+    #error{display:none;background:#7f1d1d;color:#fecaca;border:1px solid rgba(254,202,202,.34);border-radius:12px;padding:8px 10px;font-size:12px;line-height:1.35;direction:rtl}
+    #error.show{display:block}
+    .hint{font-size:11px;color:#93a4c8;line-height:1.35;direction:rtl;text-align:right}
+    @media(min-width:760px){#stage{inset:0 380px 0 0}#panel{top:0;right:0;left:auto;height:100%;width:380px;border-radius:0;padding-top:22px}#grab{display:none}.slider{grid-template-columns:minmax(140px,1fr) 1.3fr 34px}}
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <main id="stage" aria-label="3D head viewer">
+      <div id="canvasHost"></div>
+      <div id="boot"><div><b>Morph Head Studio</b><span>טוען מנוע תלת־ממד...</span></div></div>
+    </main>
+    <section id="panel">
+      <div id="grab"></div>
+      <header>
+        <div>
+          <h1>Morph Head Studio</h1>
+          <div id="status">מאתחל...</div>
+        </div>
+        <label class="upload">Upload GLB<input id="fileInput" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" /></label>
+      </header>
+      <div id="error"></div>
+      <div class="row" id="toggles">
+        <button id="loomisBtn" class="on">Loomis</button>
+        <button id="wireBtn">Wire</button>
+        <button id="resetBtn">Reset</button>
+        <button id="reloadBtn">Reload</button>
+      </div>
+      <div class="row" id="presets">
+        <button data-preset="smile">Smile</button>
+        <button data-preset="surprise">Surprise</button>
+        <button data-preset="angry">Angry</button>
+        <button data-preset="talk">Talk</button>
+      </div>
+      <div class="row" id="tabs">
+        <button data-tab="all" class="on">All</button>
+        <button data-tab="eyes">Eyes</button>
+        <button data-tab="mouth">Mouth</button>
+        <button data-tab="brows">Brows</button>
+      </div>
+      <div class="hint">גרירה על הראש מסובבת. הסליידרים עובדים רק אחרי שהמודל נטען. אם Ready Player Me נחסם, העלה GLB מהאייפון.</div>
+      <div id="sliders"></div>
+    </section>
+  </div>
+
+  <script>
+    function showBootError(message){
+      var s=document.getElementById('status');
+      var e=document.getElementById('error');
+      var b=document.getElementById('boot');
+      if(s) s.textContent='שגיאה בטעינה';
+      if(e){e.textContent=message;e.classList.add('show')}
+      if(b) b.innerHTML='<div><b>הטעינה נכשלה</b><span>'+message+'</span></div>';
+    }
+    window.addEventListener('error',function(ev){showBootError((ev.message||'JavaScript error')+'')});
+    window.addEventListener('unhandledrejection',function(ev){showBootError((ev.reason&&ev.reason.message?ev.reason.message:ev.reason)||'Unhandled promise rejection')});
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const DEFAULT_MODEL = 'https://models.readyplayer.me/65a8dba831b23abb4f401bae.glb?morphTargets=ARKit,Oculus%20Visemes&textureAtlas=none&lod=0';
+    const PRESETS = {
+      smile: { mouthSmileLeft:.8, mouthSmileRight:.8, cheekSquintLeft:.25, cheekSquintRight:.25 },
+      surprise: { jawOpen:.65, eyeWideLeft:.75, eyeWideRight:.75, browInnerUp:.7, browOuterUpLeft:.45, browOuterUpRight:.45 },
+      angry: { browDownLeft:.8, browDownRight:.8, eyeSquintLeft:.35, eyeSquintRight:.35, mouthFrownLeft:.3, mouthFrownRight:.3 },
+      talk: { jawOpen:.45, mouthFunnel:.25, mouthPucker:.12 }
+    };
+
+    const $ = id => document.getElementById(id);
+    const statusEl = $('status');
+    const errorEl = $('error');
+    const bootEl = $('boot');
+    const slidersEl = $('sliders');
+    const host = $('canvasHost');
+    const stage = $('stage');
+
+    let scene, camera, renderer, loader;
+    let modelGroup = null;
+    let loomisGroup = null;
+    let morphs = [];
+    let activeTab = 'all';
+    let values = {};
+    let wire = false;
+    let overlay = true;
+    let pointers = new Map();
+    let rotX = 0, rotY = 0, zoom = 1;
+
+    function setStatus(text){ statusEl.textContent = text; }
+    function setError(text){ errorEl.textContent = text || ''; errorEl.classList.toggle('show', !!text); }
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+    function init(){
+      setStatus('מאתחל WebGL...');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x070b16);
+
+      camera = new THREE.PerspectiveCamera(34, 1, 0.01, 100);
+      camera.position.set(0, 0.08, 3.05);
+
+      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false, powerPreference:'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      host.appendChild(renderer.domElement);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x20304f, 2.15);
+      scene.add(hemi);
+      const key = new THREE.DirectionalLight(0xffffff, 2.3);
+      key.position.set(1.8, 2.6, 2.8);
+      scene.add(key);
+      const fill = new THREE.DirectionalLight(0x8fc7ff, .85);
+      fill.position.set(-2.5, .6, 1.4);
+      scene.add(fill);
+
+      loader = new GLTFLoader();
+      loader.setCrossOrigin('anonymous');
+
+      addEvents();
+      resize();
+      window.addEventListener('resize', resize);
+      requestAnimationFrame(tick);
+      loadModel(DEFAULT_MODEL);
+    }
+
+    function resize(){
+      const r = stage.getBoundingClientRect();
+      renderer.setSize(Math.max(1,r.width), Math.max(1,r.height), false);
+      camera.aspect = Math.max(1,r.width) / Math.max(1,r.height);
+      camera.updateProjectionMatrix();
+    }
+
+    function tick(){
+      requestAnimationFrame(tick);
+      if(modelGroup){
+        modelGroup.rotation.y = rotY;
+        modelGroup.rotation.x = rotX;
+        modelGroup.scale.setScalar(zoom * modelGroup.userData.baseScale);
+      }
+      if(loomisGroup){
+        loomisGroup.visible = overlay;
+        loomisGroup.rotation.y = rotY;
+        loomisGroup.rotation.x = rotX;
+        loomisGroup.scale.setScalar(zoom);
+      }
+      renderer.render(scene, camera);
+    }
+
+    function addEvents(){
+      stage.addEventListener('pointerdown', ev => {
+        pointers.set(ev.pointerId, {x:ev.clientX,y:ev.clientY});
+        stage.setPointerCapture?.(ev.pointerId);
+      });
+      stage.addEventListener('pointermove', ev => {
+        if(!pointers.has(ev.pointerId)) return;
+        const old = pointers.get(ev.pointerId);
+        const dx = ev.clientX - old.x;
+        const dy = ev.clientY - old.y;
+        pointers.set(ev.pointerId, {x:ev.clientX,y:ev.clientY});
+        if(pointers.size === 1){
+          rotY += dx * .008;
+          rotX = clamp(rotX + dy * .008, -1.05, 1.05);
+        }
+      });
+      const end = ev => pointers.delete(ev.pointerId);
+      stage.addEventListener('pointerup', end);
+      stage.addEventListener('pointercancel', end);
+      stage.addEventListener('wheel', ev => { ev.preventDefault(); zoom = clamp(zoom - ev.deltaY*.001, .55, 2.3); }, {passive:false});
+
+      $('fileInput').addEventListener('change', ev => {
+        const file = ev.target.files && ev.target.files[0];
+        if(file) loadModel(URL.createObjectURL(file), file.name);
+      });
+      $('loomisBtn').addEventListener('click', () => { overlay = !overlay; $('loomisBtn').classList.toggle('on', overlay); });
+      $('wireBtn').addEventListener('click', () => { wire = !wire; $('wireBtn').classList.toggle('on', wire); applyWire(); });
+      $('resetBtn').addEventListener('click', resetMorphs);
+      $('reloadBtn').addEventListener('click', () => loadModel(DEFAULT_MODEL));
+      document.querySelectorAll('[data-preset]').forEach(btn => btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
+      document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => {
+        activeTab = btn.dataset.tab;
+        document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b === btn));
+        renderSliders();
+      }));
+    }
+
+    function clearSceneModel(){
+      if(modelGroup){ scene.remove(modelGroup); disposeObject(modelGroup); modelGroup = null; }
+      if(loomisGroup){ scene.remove(loomisGroup); disposeObject(loomisGroup); loomisGroup = null; }
+      morphs = [];
+      values = {};
+      slidersEl.innerHTML = '';
+    }
+
+    function disposeObject(obj){
+      obj.traverse(child => {
+        if(child.geometry) child.geometry.dispose?.();
+        if(child.material){
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach(m => m.dispose?.());
+        }
+      });
+    }
+
+    function getBox(root){
+      const box = new THREE.Box3();
+      let ok = false;
+      root.updateMatrixWorld(true);
+      root.traverse(o => {
+        if(o.isMesh && o.geometry){
+          o.geometry.computeBoundingBox();
+          const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+          if(!ok){ box.copy(b); ok = true; } else box.union(b);
+        }
+      });
+      return ok ? box : null;
+    }
+
+    function loadModel(url, label='Ready Player Me'){
+      clearSceneModel();
+      setError('');
+      setStatus('טוען מודל: ' + label);
+      bootEl.style.display = 'grid';
+      bootEl.innerHTML = '<div><b>Morph Head Studio</b><span>טוען מודל...</span></div>';
+      loader.load(url, gltf => {
+        const raw = gltf.scene;
+        const box = getBox(raw);
+        if(!box) throw new Error('הקובץ נטען אבל אין בו mesh תקין');
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const fullBody = size.y > size.x * 2.2 && size.y > 1.0;
+        const focus = new THREE.Vector3(center.x, fullBody ? box.min.y + size.y * .84 : center.y + size.y * .05, center.z);
+        raw.position.sub(focus);
+
+        modelGroup = new THREE.Group();
+        modelGroup.name = 'modelGroup';
+        const visibleHeight = fullBody ? size.y * .28 : Math.max(size.x, size.y, size.z);
+        modelGroup.userData.baseScale = 1.55 / Math.max(visibleHeight, .001);
+        modelGroup.add(raw);
+        scene.add(modelGroup);
+
+        loomisGroup = makeLoomisOverlay();
+        scene.add(loomisGroup);
+
+        morphs = collectMorphs(modelGroup);
+        applyWire();
+        resetMorphs(false);
+        renderSliders();
+        bootEl.style.display = 'none';
+        setStatus(morphs.length ? `${morphs.length} morph targets נמצאו` : 'המודל נטען, אבל לא נמצאו morph targets');
+      }, progress => {
+        if(progress.total) setStatus('טוען ' + Math.round(progress.loaded / progress.total * 100) + '%');
+      }, err => {
+        console.error(err);
+        setStatus('המודל לא נטען');
+        setError('טעינת Ready Player Me נכשלה. נסה Reload או Upload GLB מתוך האייפון.');
+        bootEl.innerHTML = '<div><b>המודל לא נטען</b><span>אפשר להעלות GLB ידנית מהכפתור למטה.</span></div>';
+      });
+    }
+
+    function collectMorphs(root){
+      const map = new Map();
+      root.traverse(o => {
+        if(o.isMesh && o.morphTargetDictionary && o.morphTargetInfluences){
+          Object.keys(o.morphTargetDictionary).forEach(name => {
+            if(!map.has(name)) map.set(name, []);
+            map.get(name).push({ mesh:o, index:o.morphTargetDictionary[name] });
+          });
+        }
+      });
+      return Array.from(map.entries()).map(([name, targets]) => ({name, targets})).sort((a,b) => a.name.localeCompare(b.name));
+    }
+
+    function setMorph(name, value){
+      values[name] = value;
+      const item = morphs.find(m => m.name === name);
+      if(!item) return;
+      item.targets.forEach(t => { t.mesh.morphTargetInfluences[t.index] = value; });
+    }
+
+    function resetMorphs(updateUi=true){
+      morphs.forEach(m => setMorph(m.name, 0));
+      values = {};
+      if(updateUi) renderSliders();
+    }
+
+    function applyPreset(name){
+      resetMorphs(false);
+      const preset = PRESETS[name] || {};
+      Object.entries(preset).forEach(([m,v]) => setMorph(m, v));
+      renderSliders();
+    }
+
+    function filterMorph(name){
+      if(activeTab === 'eyes') return /eye|cheek/i.test(name);
+      if(activeTab === 'mouth') return /mouth|jaw|tongue|viseme/i.test(name);
+      if(activeTab === 'brows') return /brow/i.test(name);
+      return true;
+    }
+
+    function renderSliders(){
+      slidersEl.innerHTML = '';
+      const list = morphs.filter(m => filterMorph(m.name));
+      if(!list.length){
+        slidersEl.innerHTML = '<div class="hint">אין סליידרים בקטגוריה הזאת כרגע.</div>';
+        return;
+      }
+      for(const item of list){
+        const row = document.createElement('label');
+        row.className = 'slider';
+        const name = document.createElement('span');
+        name.textContent = item.name;
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = '0'; input.max = '1'; input.step = '0.01';
+        input.value = values[item.name] || 0;
+        const out = document.createElement('output');
+        out.textContent = Number(input.value).toFixed(2);
+        input.addEventListener('input', () => { const v = parseFloat(input.value); out.textContent = v.toFixed(2); setMorph(item.name, v); });
+        row.append(name, input, out);
+        slidersEl.appendChild(row);
+      }
+    }
+
+    function applyWire(){
+      if(!modelGroup) return;
+      modelGroup.traverse(o => {
+        if(o.isMesh && o.material){
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(m => { m.wireframe = wire; m.needsUpdate = true; });
+        }
+      });
+    }
+
+    function makeLoomisOverlay(){
+      const g = new THREE.Group();
+      const lineMat = new THREE.LineBasicMaterial({ color:0x7dd3fc, transparent:true, opacity:.95 });
+      const ghostMat = new THREE.MeshBasicMaterial({ color:0xffffff, wireframe:true, transparent:true, opacity:.16, depthTest:false });
+      const sphere = new THREE.Mesh(new THREE.SphereGeometry(.54, 56, 28), ghostMat);
+      sphere.scale.set(1, .96, .92);
+      g.add(sphere);
+      function ring(rx, ry, rz, sx=1, sy=1){
+        const pts = new THREE.EllipseCurve(0,0,.54*sx,.54*sy,0,Math.PI*2,false,0).getPoints(144);
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
+        line.rotation.set(rx, ry, rz);
+        line.renderOrder = 10;
+        g.add(line);
+      }
+      ring(Math.PI/2,0,0,1,.92);
+      ring(0,Math.PI/2,0,.92,1);
+      ring(0,0,0,1,.96);
+      const eye = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.64,0,0), new THREE.Vector3(.64,0,0)]), lineMat);
+      const center = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,.64,0), new THREE.Vector3(0,-.78,0)]), lineMat);
+      g.add(eye, center);
+      g.position.set(0, .03, .025);
+      return g;
+    }
+
+    try { init(); }
+    catch(err){
+      console.error(err);
+      showBootError(err && err.message ? err.message : 'WebGL failed');
+    }
+  </script>
+</body>
 </html>
