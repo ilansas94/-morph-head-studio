@@ -1,6 +1,13 @@
 # Morph Head Studio
 
-Mobile-first Morph + Loomis Head app built with Vite, React and Three.js.
+Mobile-first Morph + Loomis Head app.
+
+The app now loads a physical GLB stored inside this repository first:
+
+- `models/morph_loomis_head_arkit_oculus.glb`
+- backup path: `assets/morph-loomis-head/morph_loomis_head_arkit_oculus.glb`
+
+The bundled GLB is restored from the previously downloaded TalkingHead / MPFB asset report and contains real morph targets. The remote Ready Player Me URL is kept only as a last fallback.
 
 ## Local run
 
@@ -8,7 +15,3 @@ Mobile-first Morph + Loomis Head app built with Vite, React and Three.js.
 npm install
 npm run dev
 ```
-
-## iPhone
-
-Open the GitHub Pages URL after the deploy finishes. The app loads a Ready Player Me GLB with ARKit/Oculus morph targets and also supports uploading a GLB from the phone.
